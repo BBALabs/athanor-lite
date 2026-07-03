@@ -18,6 +18,15 @@ pub enum Role {
     Embedding,
 }
 
+/// One downloadable artifact, verified against Hugging Face LFS metadata.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct QuantFile {
+    pub name: String,
+    pub size_bytes: u64,
+    pub sha256: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct QuantOption {
@@ -26,6 +35,9 @@ pub struct QuantOption {
     pub file_gb: f64,
     /// Estimated memory floor: weights + KV cache at 8K context + runtime overhead.
     pub min_mem_gb: f64,
+    /// Exact files for this quant (split GGUFs have several, in order).
+    #[serde(default)]
+    pub files: Vec<QuantFile>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -87,6 +99,32 @@ mod tests {
                     "{} {}: memory floor must exceed file size",
                     e.id,
                     q.label
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn every_quant_has_verified_files() {
+        let c = catalog().unwrap();
+        for e in &c.entries {
+            for q in &e.quants {
+                assert!(!q.files.is_empty(), "{} {} has no files", e.id, q.label);
+                for f in &q.files {
+                    assert_eq!(f.sha256.len(), 64, "{} {} bad sha", e.id, q.label);
+                    assert!(f.sha256.chars().all(|c| c.is_ascii_hexdigit()));
+                    assert!(f.size_bytes > 0);
+                    assert!(f.name.ends_with(".gguf"), "{} {}: {}", e.id, q.label, f.name);
+                }
+                let total: u64 = q.files.iter().map(|f| f.size_bytes).sum();
+                let gb = total as f64 / 1e9;
+                assert!(
+                    (gb - q.file_gb).abs() < 0.06,
+                    "{} {}: fileGb {} vs real {:.2}",
+                    e.id,
+                    q.label,
+                    q.file_gb,
+                    gb
                 );
             }
         }

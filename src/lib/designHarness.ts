@@ -11,7 +11,9 @@ import rawCatalog from "../../src-tauri/src/models/catalog.json";
 import { IN_TAURI } from "./tauriEnv";
 import type {
   Catalog,
+  DownloadProgress,
   HardwareReport,
+  LibraryModel,
   Pick,
   RecommendationSet,
   Role,
@@ -163,11 +165,102 @@ function list(): WorkspaceList {
   return { workspaces: [...workspaces], activeId, damaged: [] };
 }
 
+/* Simulated download machinery — visual behavior only. */
+let harnessLibrary: LibraryModel[] = [];
+const harnessTimers: Record<string, number> = {};
+let onProgress: ((p: DownloadProgress) => void) | null = null;
+
+function findQuant(entryId: string, quantLabel: string) {
+  const entry = catalog.entries.find((e) => e.id === entryId);
+  const quant = entry?.quants.find((q) => q.label === quantLabel);
+  if (!entry || !quant || !quant.files[0]) throw { code: "DOWNLOAD", message: "unknown model" };
+  return { entry, quant, file: quant.files[0] };
+}
+
 export const harnessIpc = {
   detectHardware: async () => ({ ...HW, detectedAt: new Date().toISOString() }),
   getRecommendations: async () => recommendations(),
   getModelCatalog: async () => catalog,
   listWorkspaces: async () => list(),
+
+  listLibrary: async () => [...harnessLibrary],
+
+  startDownload: async (entryId: string, quantLabel: string) => {
+    const { entry, quant, file } = findQuant(entryId, quantLabel);
+    if (harnessTimers[file.sha256] !== undefined) return;
+    let received = 0;
+    const emit = (state: DownloadProgress["state"]) =>
+      onProgress?.({
+        sha256: file.sha256,
+        entryId: entry.id,
+        quant: quant.label,
+        fileName: file.name,
+        receivedBytes: received,
+        totalBytes: file.sizeBytes,
+        bytesPerSec: 88 * 1024 * 1024,
+        state,
+        error: null,
+      });
+    emit("starting");
+    harnessTimers[file.sha256] = window.setInterval(() => {
+      received = Math.min(file.sizeBytes, received + file.sizeBytes * 0.04);
+      if (received >= file.sizeBytes) {
+        window.clearInterval(harnessTimers[file.sha256]);
+        delete harnessTimers[file.sha256];
+        emit("verifying");
+        window.setTimeout(() => {
+          harnessLibrary = [
+            {
+              schema: 1,
+              sha256: file.sha256,
+              fileName: file.name,
+              path: `X:/harness/models/${file.sha256}/${file.name}`,
+              sizeBytes: file.sizeBytes,
+              displayName: entry.name,
+              entryId: entry.id,
+              quant: quant.label,
+              source: "huggingface",
+              addedAt: new Date().toISOString(),
+            },
+            ...harnessLibrary,
+          ];
+          emit("done");
+        }, 900);
+      } else {
+        emit("downloading");
+      }
+    }, 350);
+  },
+
+  cancelDownload: async (sha256: string) => {
+    if (harnessTimers[sha256] !== undefined) {
+      window.clearInterval(harnessTimers[sha256]);
+      delete harnessTimers[sha256];
+      onProgress?.({
+        sha256,
+        entryId: "",
+        quant: "",
+        fileName: "",
+        receivedBytes: 0,
+        totalBytes: 0,
+        bytesPerSec: 0,
+        state: "cancelled",
+        error: null,
+      });
+    }
+  },
+
+  deleteModel: async (sha256: string) => {
+    harnessLibrary = harnessLibrary.filter((m) => m.sha256 !== sha256);
+    return [...harnessLibrary];
+  },
+
+  onDownloadProgress: async (handler: (p: DownloadProgress) => void) => {
+    onProgress = handler;
+    return () => {
+      onProgress = null;
+    };
+  },
 
   createWorkspace: async (args: {
     name: string;

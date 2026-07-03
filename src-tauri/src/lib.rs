@@ -1,14 +1,41 @@
+mod downloads;
 mod error;
 mod hardware;
 mod models;
 mod workspaces;
 
+use downloads::{Downloads, LibraryModel};
 use error::Result;
 use hardware::HardwareReport;
 use models::recommend::RecommendationSet;
 use models::Catalog;
 use tauri::Manager;
 use workspaces::{Workspace, WorkspaceList, WsLock};
+
+#[tauri::command]
+fn start_download(
+    app: tauri::AppHandle,
+    registry: tauri::State<'_, Downloads>,
+    entry_id: String,
+    quant: String,
+) -> Result<()> {
+    downloads::start(app, &registry, &entry_id, &quant)
+}
+
+#[tauri::command]
+fn cancel_download(registry: tauri::State<'_, Downloads>, sha256: String) {
+    downloads::cancel(&registry, &sha256);
+}
+
+#[tauri::command]
+fn list_library(app: tauri::AppHandle) -> Result<Vec<LibraryModel>> {
+    downloads::list_library(&app)
+}
+
+#[tauri::command]
+fn delete_model(app: tauri::AppHandle, sha256: String) -> Result<Vec<LibraryModel>> {
+    downloads::delete_model(&app, &sha256)
+}
 
 #[tauri::command]
 async fn detect_hardware() -> Result<HardwareReport> {
@@ -102,6 +129,7 @@ pub fn run() {
                 .build(),
         )
         .manage(WsLock::default())
+        .manage(Downloads::default())
         .setup(|app| {
             let handle = app.handle().clone();
             if let Err(e) = std::thread::Builder::new()
@@ -133,7 +161,11 @@ pub fn run() {
             create_workspace,
             activate_workspace,
             set_workspace_model,
-            delete_workspace
+            delete_workspace,
+            start_download,
+            cancel_download,
+            list_library,
+            delete_model
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

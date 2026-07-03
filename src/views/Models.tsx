@@ -4,10 +4,11 @@
  * chips. Rows expand in place to the full quant table.
  */
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type MouseEvent } from "react";
 import { useStore } from "../state/store";
-import { ctxHuman } from "../lib/format";
-import type { CatalogEntry, QuantOption, Role } from "../lib/types";
+import { bytesHuman, ctxHuman } from "../lib/format";
+import { CloseIcon } from "../components/Icons";
+import type { CatalogEntry, DownloadProgress, QuantOption, Role } from "../lib/types";
 
 type Filter = "all" | Role;
 
@@ -54,6 +55,63 @@ function FitJewels({ quants, budgetGb }: { quants: QuantOption[]; budgetGb: numb
   );
 }
 
+/** The action cell for one quant: get / progress / installed. */
+function QuantAction({ entry, quant, verdict }: { entry: CatalogEntry; quant: QuantOption; verdict: Verdict }) {
+  const library = useStore((s) => s.library);
+  const downloads = useStore((s) => s.downloads);
+  const startDownload = useStore((s) => s.startDownload);
+  const cancelDownload = useStore((s) => s.cancelDownload);
+
+  const sha = quant.files[0]?.sha256;
+  if (!sha) return <span className="t-quiet">—</span>;
+
+  const installed = library.some((m) => m.sha256 === sha);
+  const dl: DownloadProgress | undefined = downloads[sha];
+  const active = dl && (dl.state === "starting" || dl.state === "downloading" || dl.state === "verifying");
+
+  const stop = (fn: () => void) => (e: MouseEvent) => {
+    e.stopPropagation();
+    fn();
+  };
+
+  if (installed) {
+    return <span className="quant-action quant-action--installed t-quiet">on disk</span>;
+  }
+  if (active) {
+    const pct = dl.totalBytes ? (dl.receivedBytes / dl.totalBytes) * 100 : 0;
+    return (
+      <span className="quant-action quant-action--live tnum">
+        {dl.state === "verifying" ? (
+          "verifying…"
+        ) : (
+          <>
+            {pct.toFixed(0)}% · {bytesHuman(dl.bytesPerSec)}/s
+            <button
+              className="quant-action__cancel"
+              onClick={stop(() => void cancelDownload(sha))}
+              aria-label="Cancel download"
+              title="Cancel"
+            >
+              <CloseIcon size={10} />
+            </button>
+          </>
+        )}
+      </span>
+    );
+  }
+  if (verdict === "no") {
+    return <span className="t-quiet quant-action">—</span>;
+  }
+  return (
+    <button
+      className="btn-quiet quant-action__get"
+      onClick={stop(() => void startDownload(entry.id, quant.label))}
+    >
+      Get · {quant.fileGb.toFixed(1)} GB
+    </button>
+  );
+}
+
 function QuantTable({ entry, budgetGb }: { entry: CatalogEntry; budgetGb: number }) {
   return (
     <div className="quant-table">
@@ -68,6 +126,7 @@ function QuantTable({ entry, budgetGb }: { entry: CatalogEntry; budgetGb: number
             <span className={`quant-table__verdict t-quiet quant-table__verdict--${v}`}>
               {VERDICT_WORD[v]}
             </span>
+            <QuantAction entry={entry} quant={q} verdict={v} />
           </div>
         );
       })}
@@ -79,19 +138,81 @@ function QuantTable({ entry, budgetGb }: { entry: CatalogEntry; budgetGb: number
   );
 }
 
+/** Hero-row primary affordance: get the recommended quant / live progress. */
+function HeroAction({ entry, quantLabel }: { entry: CatalogEntry; quantLabel: string }) {
+  const library = useStore((s) => s.library);
+  const downloads = useStore((s) => s.downloads);
+  const startDownload = useStore((s) => s.startDownload);
+  const cancelDownload = useStore((s) => s.cancelDownload);
+
+  const quant = entry.quants.find((q) => q.label === quantLabel) ?? entry.quants[0];
+  const sha = quant?.files[0]?.sha256;
+  if (!quant || !sha) return null;
+
+  const installed = library.some((m) => m.sha256 === sha);
+  const dl = downloads[sha];
+  const active = dl && (dl.state === "starting" || dl.state === "downloading" || dl.state === "verifying");
+
+  if (installed) {
+    return <span className="hero-action__installed t-quiet">installed · ready for a workspace</span>;
+  }
+  if (active) {
+    const pct = dl.totalBytes ? (dl.receivedBytes / dl.totalBytes) * 100 : 0;
+    return (
+      <div className="hero-action__progress" onClick={(e) => e.stopPropagation()}>
+        <div className="lightline">
+          <div className="lightline__track" />
+          <div
+            className="lightline__lit"
+            style={{
+              width: `${pct.toFixed(2)}%`,
+              background: "linear-gradient(90deg, var(--lume-deep), var(--lume) 70%, var(--lume-warm))",
+            }}
+          />
+        </div>
+        <span className="t-quiet tnum">
+          {dl.state === "verifying"
+            ? "verifying checksum…"
+            : `${bytesHuman(dl.receivedBytes)} of ${bytesHuman(dl.totalBytes)} · ${bytesHuman(dl.bytesPerSec)}/s`}
+        </span>
+        <button className="btn-quiet" onClick={() => void cancelDownload(sha)}>
+          Cancel
+        </button>
+      </div>
+    );
+  }
+  return (
+    <button
+      className="btn-lit hero-action__get"
+      onClick={(e) => {
+        e.stopPropagation();
+        void startDownload(entry.id, quant.label);
+      }}
+    >
+      Get {quant.label} · {quant.fileGb.toFixed(1)} GB
+    </button>
+  );
+}
+
 function ModelRow({
   entry,
   budgetGb,
   hero,
   heroLine,
+  heroQuant,
 }: {
   entry: CatalogEntry;
   budgetGb: number;
   hero?: boolean;
   heroLine?: string;
+  heroQuant?: string;
 }) {
   const [open, setOpen] = useState(false);
+  const library = useStore((s) => s.library);
   const runnable = entry.quants.some((q) => fitVerdict(q.minMemGb, budgetGb) !== "no");
+  const installed = entry.quants.some((q) =>
+    q.files.some((f) => library.some((m) => m.sha256 === f.sha256)),
+  );
 
   return (
     <div
@@ -104,10 +225,12 @@ function ModelRow({
           {hero && <span className="t-label">Recommended for this machine</span>}
           <span className={hero ? "t-display" : "t-title"}>{entry.name}</span>
           {hero && heroLine && <span className="ledger-row__blurb t-quiet">{heroLine}</span>}
+          {hero && heroQuant && <HeroAction entry={entry} quantLabel={heroQuant} />}
         </div>
         <span className="ledger-row__meta t-quiet">
           {entry.family} · {entry.paramsB < 1 ? `${Math.round(entry.paramsB * 1000)}M` : `${entry.paramsB.toFixed(0)}B`} ·{" "}
           {entry.roles.join(" / ")}
+          {installed && <span className="ledger-row__installed"> · on disk</span>}
         </span>
         <FitJewels quants={entry.quants} budgetGb={budgetGb} />
       </div>
@@ -174,7 +297,13 @@ export function Models() {
 
       <div className="ledger" key={filter}>
         {heroEntry && (
-          <ModelRow entry={heroEntry} budgetGb={recs.budgetGb} hero heroLine={heroLine} />
+          <ModelRow
+            entry={heroEntry}
+            budgetGb={recs.budgetGb}
+            hero
+            heroLine={heroLine}
+            heroQuant={recs.best?.quant}
+          />
         )}
         {entries.map((e) => (
           <ModelRow key={e.id} entry={e} budgetGb={recs.budgetGb} />

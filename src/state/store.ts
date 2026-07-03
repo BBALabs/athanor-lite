@@ -3,7 +3,9 @@ import { ipc } from "../lib/ipc";
 import {
   isAthanorError,
   type Catalog,
+  type DownloadProgress,
   type HardwareReport,
+  type LibraryModel,
   type RecommendationSet,
   type TelemetrySample,
   type Workspace,
@@ -35,12 +37,18 @@ interface AthanorStore {
   catalog: Catalog | null;
   telemetry: TelemetrySample[];
   workspaces: WorkspaceList;
+  library: LibraryModel[];
+  /** Live download progress, keyed by artifact sha256. */
+  downloads: Record<string, DownloadProgress>;
   /** Non-fatal, user-visible operation failure (workspace ops etc.). */
   lastOpError: string | null;
 
   setView: (v: View) => void;
   init: () => Promise<void>;
   retryHardware: () => Promise<void>;
+  startDownload: (entryId: string, quant: string) => Promise<void>;
+  cancelDownload: (sha256: string) => Promise<void>;
+  deleteModel: (sha256: string) => Promise<void>;
   createWorkspace: (args: {
     name: string;
     purpose: string;
@@ -79,6 +87,8 @@ export const useStore = create<AthanorStore>((set, get) => ({
   catalog: null,
   telemetry: [],
   workspaces: { workspaces: [], activeId: null, damaged: [] },
+  library: [],
+  downloads: {},
   lastOpError: null,
 
   setView: (view) => set({ view }),
@@ -158,6 +168,23 @@ export const useStore = create<AthanorStore>((set, get) => ({
       step("telemetry stream", "failed");
     }
 
+    // Model library + download progress stream (quiet — no boot step; a fresh
+    // install legitimately has an empty library).
+    try {
+      set({ library: await ipc.listLibrary() });
+      await ipc.onDownloadProgress((p) => {
+        set((s) => ({ downloads: { ...s.downloads, [p.sha256]: p } }));
+        if (p.state === "done") {
+          void ipc
+            .listLibrary()
+            .then((library) => set({ library }))
+            .catch(() => {});
+        }
+      });
+    } catch (e) {
+      console.error("library unavailable", e);
+    }
+
     const { degraded } = get();
     // Truly fatal only when nothing at all came up (e.g. the IPC bridge is gone).
     if (degraded.length >= 5) {
@@ -179,6 +206,35 @@ export const useStore = create<AthanorStore>((set, get) => ({
         recommendations,
         degraded: s.degraded.filter((d) => d !== "hardware" && d !== "recommendations"),
       }));
+    } catch (e) {
+      set({ lastOpError: errText(e) });
+    }
+  },
+
+  startDownload: async (entryId, quant) => {
+    try {
+      await ipc.startDownload(entryId, quant);
+    } catch (e) {
+      set({ lastOpError: errText(e) });
+    }
+  },
+
+  cancelDownload: async (sha256) => {
+    try {
+      await ipc.cancelDownload(sha256);
+    } catch (e) {
+      set({ lastOpError: errText(e) });
+    }
+  },
+
+  deleteModel: async (sha256) => {
+    try {
+      const library = await ipc.deleteModel(sha256);
+      set((s) => {
+        const downloads = { ...s.downloads };
+        delete downloads[sha256];
+        return { library, downloads };
+      });
     } catch (e) {
       set({ lastOpError: errText(e) });
     }

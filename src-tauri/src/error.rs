@@ -15,6 +15,15 @@ pub enum AthanorError {
     #[error("model catalog error: {0}")]
     Catalog(String),
 
+    #[error("download error: {0}")]
+    Download(String),
+
+    #[error("runtime error: {0}")]
+    Runtime(String),
+
+    #[error("chat error: {0}")]
+    Chat(String),
+
     #[error("filesystem error: {0}")]
     Io(#[from] std::io::Error),
 
@@ -31,6 +40,9 @@ impl AthanorError {
             AthanorError::Hardware(_) => "HARDWARE",
             AthanorError::Workspace(_) => "WORKSPACE",
             AthanorError::Catalog(_) => "CATALOG",
+            AthanorError::Download(_) => "DOWNLOAD",
+            AthanorError::Runtime(_) => "RUNTIME",
+            AthanorError::Chat(_) => "CHAT",
             AthanorError::Io(_) => "IO",
             AthanorError::Serde(_) => "SERDE",
             AthanorError::Path(_) => "PATH",

@@ -35,22 +35,38 @@ function Spine() {
 function StatusBar() {
   const sample = useLatestSample();
   const { workspaces, activeId } = useStore((s) => s.workspaces);
+  const downloads = useStore((s) => s.downloads);
   const active = workspaces.find((w) => w.id === activeId);
+
+  // One live download owns the center of the status line while it runs.
+  const liveDl = Object.values(downloads).find(
+    (d) => d.state === "downloading" || d.state === "verifying" || d.state === "starting",
+  );
 
   return (
     <footer className="statusbar">
       <div className="statusbar__cell">
         <span className={`statusbar__beat${sample ? " statusbar__beat--live" : ""}`} />
-        <span className="t-quiet tnum">telemetry {sample ? "1 Hz" : "—"}</span>
+        <span className="t-quiet tnum" title="Local monitor — nothing leaves this machine">
+          local monitor {sample ? "1 Hz" : "—"}
+        </span>
       </div>
       <div className="statusbar__cell statusbar__cell--center">
-        {active && (
-          <>
-            <span className="statusbar__monogram" style={{ ["--ws-hue" as string]: active.accentHue }}>
-              {monogram(active.name)}
-            </span>
-            <span className="t-quiet">{active.name}</span>
-          </>
+        {liveDl ? (
+          <span className="t-quiet tnum statusbar__dl">
+            {liveDl.state === "verifying"
+              ? `verifying ${liveDl.fileName}`
+              : `${liveDl.fileName} · ${liveDl.totalBytes ? ((liveDl.receivedBytes / liveDl.totalBytes) * 100).toFixed(0) : 0}%`}
+          </span>
+        ) : (
+          active && (
+            <>
+              <span className="statusbar__monogram" style={{ ["--ws-hue" as string]: active.accentHue }}>
+                {monogram(active.name)}
+              </span>
+              <span className="t-quiet">{active.name}</span>
+            </>
+          )
         )}
       </div>
       <div className="statusbar__cell statusbar__cell--right">

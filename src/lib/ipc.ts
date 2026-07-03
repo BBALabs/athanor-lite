@@ -10,7 +10,9 @@ import { IN_TAURI } from "./tauriEnv";
 import { harnessIpc } from "./designHarness";
 import type {
   Catalog,
+  DownloadProgress,
   HardwareReport,
+  LibraryModel,
   RecommendationSet,
   TelemetrySample,
   Workspace,
@@ -45,6 +47,18 @@ const tauriIpc = {
 
   onTelemetry: (handler: (s: TelemetrySample) => void): Promise<UnlistenFn> =>
     listen<TelemetrySample>("telemetry://sample", (e) => handler(e.payload)),
+
+  startDownload: (entryId: string, quant: string) =>
+    invoke<void>("start_download", { entryId, quant }),
+
+  cancelDownload: (sha256: string) => invoke<void>("cancel_download", { sha256 }),
+
+  listLibrary: () => invoke<LibraryModel[]>("list_library"),
+
+  deleteModel: (sha256: string) => invoke<LibraryModel[]>("delete_model", { sha256 }),
+
+  onDownloadProgress: (handler: (p: DownloadProgress) => void): Promise<UnlistenFn> =>
+    listen<DownloadProgress>("download://progress", (e) => handler(e.payload)),
 };
 
 type Ipc = typeof tauriIpc;

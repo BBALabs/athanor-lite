@@ -85,10 +85,50 @@ export interface TelemetrySample {
 
 export type Role = "general" | "coding" | "reasoning" | "embedding";
 
+export interface QuantFile {
+  name: string;
+  sizeBytes: number;
+  sha256: string;
+}
+
 export interface QuantOption {
   label: string;
   fileGb: number;
   minMemGb: number;
+  files: QuantFile[];
+}
+
+export type DownloadState =
+  | "starting"
+  | "downloading"
+  | "verifying"
+  | "done"
+  | "failed"
+  | "cancelled";
+
+export interface DownloadProgress {
+  sha256: string;
+  entryId: string;
+  quant: string;
+  fileName: string;
+  receivedBytes: number;
+  totalBytes: number;
+  bytesPerSec: number;
+  state: DownloadState;
+  error: string | null;
+}
+
+export interface LibraryModel {
+  schema: number;
+  sha256: string;
+  fileName: string;
+  path: string;
+  sizeBytes: number;
+  displayName: string;
+  entryId: string | null;
+  quant: string | null;
+  source: string;
+  addedAt: string;
 }
 
 export interface CatalogEntry {

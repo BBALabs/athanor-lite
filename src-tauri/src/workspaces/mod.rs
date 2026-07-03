@@ -18,9 +18,10 @@ use crate::error::{AthanorError, Result};
 
 pub const SCHEMA_VERSION: u32 = 1;
 
-fn schema_version() -> u32 {
+pub fn schema_version_default() -> u32 {
     SCHEMA_VERSION
 }
+use schema_version_default as schema_version;
 
 /// Serializes all workspace mutations. Reads are cheap; writes are rare.
 #[derive(Default)]
