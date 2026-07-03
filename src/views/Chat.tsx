@@ -10,7 +10,59 @@ import { Markdown } from "../components/Markdown";
 import { PlusIcon, TrashIcon } from "../components/Icons";
 import { bytesHuman, monogram, relativeTime } from "../lib/format";
 import { KnowledgeIcon } from "../components/Icons";
-import type { ChatMessage, LibraryModel, Source } from "../lib/types";
+import type { ChatMessage, LibraryModel, Source, ToolStep } from "../lib/types";
+
+/** Pretty-print tool JSON args; fall back to the raw string if unparseable. */
+function fmtArgs(raw: string): string {
+  if (!raw || raw.trim() === "" || raw.trim() === "{}") return "";
+  try {
+    return JSON.stringify(JSON.parse(raw));
+  } catch {
+    return raw;
+  }
+}
+
+/** One autonomous tool call — expandable to show arguments and the result. */
+function ToolStepRow({ step, live }: { step: ToolStep; live?: boolean }) {
+  const [open, setOpen] = useState(false);
+  const args = fmtArgs(step.arguments);
+  return (
+    <div className={`toolstep${step.ok ? "" : " toolstep--fail"}${live ? " toolstep--live" : ""}`}>
+      <button className="toolstep__head" onClick={() => setOpen((o) => !o)}>
+        <span className={`toolstep__dot${step.ok ? "" : " toolstep__dot--fail"}`} aria-hidden="true" />
+        <span className="toolstep__tool t-mono">{step.tool}</span>
+        {args && <span className="toolstep__args t-mono">{args}</span>}
+        <span className="toolstep__chev t-quiet">{open ? "−" : "+"}</span>
+      </button>
+      {open && (
+        <div className="toolstep__body">
+          {args && (
+            <div className="toolstep__field">
+              <span className="toolstep__label t-quiet">arguments</span>
+              <pre className="toolstep__pre t-mono">{args}</pre>
+            </div>
+          )}
+          <div className="toolstep__field">
+            <span className="toolstep__label t-quiet">{step.ok ? "result" : "error"}</span>
+            <pre className="toolstep__pre t-mono">{step.result || "(empty)"}</pre>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** The full set of tool calls made during one turn. */
+function ToolSteps({ steps, live }: { steps: ToolStep[]; live?: boolean }) {
+  if (steps.length === 0) return null;
+  return (
+    <div className="toolsteps">
+      {steps.map((s, i) => (
+        <ToolStepRow key={i} step={s} live={live} />
+      ))}
+    </div>
+  );
+}
 
 /** Retrieved sources shown under a reply — transparency for what was pulled. */
 function Sources({ sources }: { sources: Source[] }) {
@@ -149,6 +201,7 @@ export function Chat() {
   const streamText = useStore((s) => s.streamText);
   const generating = useStore((s) => s.generating);
   const liveSources = useStore((s) => s.liveSources);
+  const liveToolSteps = useStore((s) => s.liveToolSteps);
   const library = useStore((s) => s.library);
   const sendMessage = useStore((s) => s.sendMessage);
   const stopGeneration = useStore((s) => s.stopGeneration);
@@ -278,6 +331,9 @@ export function Chat() {
                 )}
                 {activeConv?.messages.map((m, i) => (
                   <div key={i} className={`msg msg--${m.role}`}>
+                    {m.role === "assistant" && m.toolSteps?.length > 0 && (
+                      <ToolSteps steps={m.toolSteps} />
+                    )}
                     {m.role === "assistant" ? <Markdown text={m.content} /> : m.content}
                     {m.role === "assistant" && m.sources?.length > 0 && <Sources sources={m.sources} />}
                     {m.role === "assistant" && <StatsLine msg={m} />}
@@ -286,6 +342,7 @@ export function Chat() {
                 {generating && (
                   <div className="msg msg--assistant">
                     <RetrievalStrip sources={liveSources} />
+                    <ToolSteps steps={liveToolSteps} live />
                     {streamText ? <Markdown text={streamText} /> : null}
                     <span className="caret" aria-hidden="true" />
                   </div>

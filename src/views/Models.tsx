@@ -9,7 +9,15 @@ import { useStore } from "../state/store";
 import { ipc } from "../lib/ipc";
 import { bytesHuman, ctxHuman } from "../lib/format";
 import { CloseIcon } from "../components/Icons";
-import type { CatalogEntry, DownloadProgress, OllamaStatus, QuantOption, Role } from "../lib/types";
+import type {
+  CatalogEntry,
+  DownloadProgress,
+  FitMode,
+  OllamaStatus,
+  QuantFit,
+  QuantOption,
+  Role,
+} from "../lib/types";
 
 type Filter = "all" | Role;
 
@@ -21,43 +29,56 @@ const FILTERS: { id: Filter; label: string }[] = [
   { id: "embedding", label: "Embedding" },
 ];
 
-type Verdict = "fits" | "tight" | "no";
+/** Fit verdicts come from the backend (one source of truth) via a lookup. */
+type FitLookup = (entryId: string, quant: string) => QuantFit | undefined;
 
-/**
- * Honest fit: "tight" lives INSIDE the budget (85–100%). Over budget is over
- * budget — the app's core promise is that a verdict is never a euphemism.
- */
-function fitVerdict(minMemGb: number, budgetGb: number): Verdict {
-  if (minMemGb <= budgetGb * 0.85) return "fits";
-  if (minMemGb <= budgetGb) return "tight";
-  return "no";
-}
-
-const VERDICT_WORD: Record<Verdict, string> = {
-  fits: "fits",
-  tight: "tight",
-  no: "exceeds this machine",
+/** Jewel class per fit mode — the visual grammar of "how well it runs". */
+const JEWEL_CLASS: Record<FitMode, string> = {
+  gpuFull: "fits",
+  gpuTight: "tight",
+  partialOffload: "partial",
+  cpu: "cpu",
+  exceeds: "no",
 };
 
-function FitJewels({ quants, budgetGb }: { quants: QuantOption[]; budgetGb: number }) {
+const VERDICT_WORD: Record<FitMode, string> = {
+  gpuFull: "fits on GPU",
+  gpuTight: "tight",
+  partialOffload: "GPU + CPU split",
+  cpu: "CPU only",
+  exceeds: "exceeds this machine",
+};
+
+function fitTitle(fit: QuantFit | undefined): string {
+  if (!fit) return "fit unknown";
+  const base = `${VERDICT_WORD[fit.fitMode]} · ~${fit.estMemGb.toFixed(1)} GB loaded`;
+  if (fit.fitMode === "gpuFull" || fit.fitMode === "gpuTight") {
+    return `${base} · up to ${ctxHuman(fit.maxCtx)} context`;
+  }
+  if (fit.fitMode === "partialOffload" && fit.gpuOffloadPct != null) {
+    return `${base} · ~${fit.gpuOffloadPct}% of layers on GPU`;
+  }
+  return base;
+}
+
+function runnable(mode: FitMode): boolean {
+  return mode !== "exceeds";
+}
+
+function FitJewels({ entry, fitOf }: { entry: CatalogEntry; fitOf: FitLookup }) {
   return (
     <div className="jewels">
-      {quants.map((q) => {
-        const v = fitVerdict(q.minMemGb, budgetGb);
-        return (
-          <span
-            key={q.label}
-            className={`jewel jewel--${v}`}
-            title={`${q.label} — ${VERDICT_WORD[v]} (~${q.minMemGb.toFixed(1)} GB loaded)`}
-          />
-        );
+      {entry.quants.map((q) => {
+        const fit = fitOf(entry.id, q.label);
+        const cls = fit ? JEWEL_CLASS[fit.fitMode] : "no";
+        return <span key={q.label} className={`jewel jewel--${cls}`} title={fitTitle(fit)} />;
       })}
     </div>
   );
 }
 
 /** The action cell for one quant: get / progress / installed. */
-function QuantAction({ entry, quant, verdict }: { entry: CatalogEntry; quant: QuantOption; verdict: Verdict }) {
+function QuantAction({ entry, quant, mode }: { entry: CatalogEntry; quant: QuantOption; mode: FitMode }) {
   const library = useStore((s) => s.library);
   const downloads = useStore((s) => s.downloads);
   const startDownload = useStore((s) => s.startDownload);
@@ -100,7 +121,7 @@ function QuantAction({ entry, quant, verdict }: { entry: CatalogEntry; quant: Qu
       </span>
     );
   }
-  if (verdict === "no") {
+  if (mode === "exceeds") {
     return <span className="t-quiet quant-action">—</span>;
   }
   return (
@@ -113,21 +134,30 @@ function QuantAction({ entry, quant, verdict }: { entry: CatalogEntry; quant: Qu
   );
 }
 
-function QuantTable({ entry, budgetGb }: { entry: CatalogEntry; budgetGb: number }) {
+function QuantTable({ entry, fitOf }: { entry: CatalogEntry; fitOf: FitLookup }) {
   return (
     <div className="quant-table">
       {entry.quants.map((q) => {
-        const v = fitVerdict(q.minMemGb, budgetGb);
+        const fit = fitOf(entry.id, q.label);
+        const mode: FitMode = fit?.fitMode ?? "exceeds";
+        const cls = JEWEL_CLASS[mode];
+        const loaded = fit ? `~${fit.estMemGb.toFixed(1)} GB loaded` : "—";
         return (
           <div className="quant-table__row" key={q.label}>
-            <span className={`jewel jewel--${v}`} />
+            <span className={`jewel jewel--${cls}`} />
             <span className="t-mono">{q.label}</span>
             <span className="t-quiet tnum">{q.fileGb.toFixed(1)} GB file</span>
-            <span className="t-quiet tnum">~{q.minMemGb.toFixed(1)} GB loaded</span>
-            <span className={`quant-table__verdict t-quiet quant-table__verdict--${v}`}>
-              {VERDICT_WORD[v]}
+            <span className="t-quiet tnum">{loaded}</span>
+            <span className={`quant-table__verdict t-quiet quant-table__verdict--${cls}`}>
+              {VERDICT_WORD[mode]}
+              {mode === "partialOffload" && fit?.gpuOffloadPct != null
+                ? ` · ${fit.gpuOffloadPct}% on GPU`
+                : ""}
+              {(mode === "gpuFull" || mode === "gpuTight") && fit
+                ? ` · to ${ctxHuman(fit.maxCtx)} ctx`
+                : ""}
             </span>
-            <QuantAction entry={entry} quant={q} verdict={v} />
+            <QuantAction entry={entry} quant={q} mode={mode} />
           </div>
         );
       })}
@@ -197,27 +227,27 @@ function HeroAction({ entry, quantLabel }: { entry: CatalogEntry; quantLabel: st
 
 function ModelRow({
   entry,
-  budgetGb,
+  fitOf,
   hero,
   heroLine,
   heroQuant,
 }: {
   entry: CatalogEntry;
-  budgetGb: number;
+  fitOf: FitLookup;
   hero?: boolean;
   heroLine?: string;
   heroQuant?: string;
 }) {
   const [open, setOpen] = useState(false);
   const library = useStore((s) => s.library);
-  const runnable = entry.quants.some((q) => fitVerdict(q.minMemGb, budgetGb) !== "no");
+  const runs = entry.quants.some((q) => runnable(fitOf(entry.id, q.label)?.fitMode ?? "exceeds"));
   const installed = entry.quants.some((q) =>
     q.files.some((f) => library.some((m) => m.sha256 === f.sha256)),
   );
 
   return (
     <div
-      className={`ledger-row${hero ? " ledger-row--hero" : ""}${open ? " ledger-row--open" : ""}${!runnable ? " ledger-row--out" : ""}`}
+      className={`ledger-row${hero ? " ledger-row--hero" : ""}${open ? " ledger-row--open" : ""}${!runs ? " ledger-row--out" : ""}`}
       onClick={() => setOpen((o) => !o)}
     >
       {hero && <div className="ledger-row__sweep" aria-hidden="true" />}
@@ -233,12 +263,12 @@ function ModelRow({
           {entry.roles.join(" / ")}
           {installed && <span className="ledger-row__installed"> · on disk</span>}
         </span>
-        <FitJewels quants={entry.quants} budgetGb={budgetGb} />
+        <FitJewels entry={entry} fitOf={fitOf} />
       </div>
       <div className="ledger-row__detail">
         <div className="ledger-row__detail-inner">
           {!hero && <p className="t-quiet ledger-row__blurb">{entry.blurb}</p>}
-          <QuantTable entry={entry} budgetGb={budgetGb} />
+          <QuantTable entry={entry} fitOf={fitOf} />
         </div>
       </div>
     </div>
@@ -305,16 +335,36 @@ export function Models() {
     return { heroEntry, entries: sorted.filter((e) => e.id !== heroEntry?.id) };
   }, [catalog, filter, recs]);
 
+  // Fit lookup from the backend's table — the same numbers everywhere.
+  const fitMap = useMemo(() => {
+    const m = new Map<string, QuantFit>();
+    for (const f of recs?.fits ?? []) m.set(`${f.entryId}:${f.quant}`, f);
+    return m;
+  }, [recs]);
+
   if (!catalog || !recs) return null;
+
+  const fitOf: FitLookup = (entryId, quant) => fitMap.get(`${entryId}:${quant}`);
 
   const shown = (heroEntry ? 1 : 0) + entries.length;
   const shownRunnable = [...entries, ...(heroEntry ? [heroEntry] : [])].filter((e) =>
-    e.quants.some((q) => q.minMemGb <= recs.budgetGb),
+    e.quants.some((q) => runnable(fitOf(e.id, q.label)?.fitMode ?? "exceeds")),
   ).length;
 
+  const budgetLine = recs.multiGpu
+    ? `budget ${recs.budgetGb.toFixed(1)} GB across ${recs.gpuCount} GPUs`
+    : `budget ${recs.budgetGb.toFixed(1)} GB`;
+
   // Instrument-voice line for the hero row, composed from real fit data.
-  const heroLine = recs.best
-    ? `${recs.best.paramsB.toFixed(0)}B · strongest pick within the ${recs.budgetGb.toFixed(1)} GB budget · ${recs.best.quant} leaves ${recs.best.headroomGb.toFixed(1)} GB headroom`
+  const b = recs.best;
+  const heroLine = b
+    ? `${b.paramsB.toFixed(0)}B · ${b.quant} · ${
+        b.fitMode === "partialOffload"
+          ? `GPU+CPU split, ~${b.gpuOffloadPct ?? 0}% on GPU`
+          : b.fitMode === "cpu"
+            ? "runs on CPU"
+            : `${b.headroomGb.toFixed(1)} GB headroom · to ${ctxHuman(b.maxCtx)} context`
+      }`
     : undefined;
 
   return (
@@ -323,7 +373,7 @@ export function Models() {
         <h1 className="t-display">Models</h1>
         <span className="view-head__sub t-quiet">
           {filter === "all"
-            ? `${shownRunnable} of ${shown} run on this machine · budget ${recs.budgetGb.toFixed(1)} GB`
+            ? `${shownRunnable} of ${shown} run on this machine · ${budgetLine}`
             : `${shown} ${filter} model${shown === 1 ? "" : "s"} · ${shownRunnable} run on this machine`}
         </span>
         <OllamaImport />
@@ -344,14 +394,14 @@ export function Models() {
         {heroEntry && (
           <ModelRow
             entry={heroEntry}
-            budgetGb={recs.budgetGb}
+            fitOf={fitOf}
             hero
             heroLine={heroLine}
             heroQuant={recs.best?.quant}
           />
         )}
         {entries.map((e) => (
-          <ModelRow key={e.id} entry={e} budgetGb={recs.budgetGb} />
+          <ModelRow key={e.id} entry={e} fitOf={fitOf} />
         ))}
       </div>
     </div>

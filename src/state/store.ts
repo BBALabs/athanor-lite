@@ -16,6 +16,7 @@ import {
   type ServerStatus,
   type Source,
   type TelemetrySample,
+  type ToolStep,
   type Workspace,
   type WorkspaceList,
 } from "../lib/types";
@@ -71,6 +72,8 @@ interface AthanorStore {
   mcpServers: McpServerView[];
   /** Live retrieval sources for the in-flight generation, before it finishes. */
   liveSources: Source[];
+  /** Tool calls the model made during the in-flight turn, in call order. */
+  liveToolSteps: ToolStep[];
 
   setView: (v: View) => void;
   dismissOnboarding: () => void;
@@ -153,6 +156,7 @@ export const useStore = create<AthanorStore>((set, get) => ({
   knowledge: null,
   mcpServers: [],
   liveSources: [],
+  liveToolSteps: [],
 
   setView: (view) => set({ view }),
   dismissOnboarding: () => set({ onboardingNeeded: false }),
@@ -401,13 +405,18 @@ export const useStore = create<AthanorStore>((set, get) => ({
       });
       await ipc.onChatDone((d) => {
         if (d.error) set({ lastOpError: d.error });
-        set({ liveSources: [] });
+        set({ liveSources: [], liveToolSteps: [] });
       });
       await ipc.onChatRetrieval((r) => {
         // Only for the active conversation's in-flight turn.
         if (get().activeConv?.id === r.conversationId || get().generating) {
           set({ liveSources: r.sources });
         }
+      });
+      await ipc.onChatTool((t) => {
+        // Append each autonomous tool call as it happens, in order.
+        if (!get().generating) return;
+        set((s) => ({ liveToolSteps: [...s.liveToolSteps, t.step] }));
       });
       await ipc.onRuntimeState((runtimeState) => set({ runtimeState }));
       await ipc.onServerStatus((serverStatus) => set({ serverStatus }));
@@ -546,10 +555,13 @@ export const useStore = create<AthanorStore>((set, get) => ({
     };
     const optimistic: Conversation = {
       ...base,
-      messages: [...base.messages, { role: "user", content: text, ts: now, stats: null, sources: [] }],
+      messages: [
+        ...base.messages,
+        { role: "user", content: text, ts: now, stats: null, sources: [], toolSteps: [] },
+      ],
       updatedAt: now,
     };
-    set({ activeConv: optimistic, generating: true, streamText: "" });
+    set({ activeConv: optimistic, generating: true, streamText: "", liveSources: [], liveToolSteps: [] });
 
     const convId = base.id === PENDING_CONV ? null : base.id;
     try {

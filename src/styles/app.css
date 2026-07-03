@@ -863,9 +863,23 @@
   box-shadow: 0 0 7px rgba(231, 192, 136, 0.4);
 }
 
+/* Partial offload — GPU+CPU split: a two-tone jewel (some GPU light, some cool). */
+.jewel--partial {
+  background: radial-gradient(circle at 35% 30%, var(--lume-warm), #67e8f9 55%, #2b4a6b);
+  box-shadow: 0 0 7px rgba(103, 232, 249, 0.35);
+}
+
+/* CPU-only — cool, dim: it runs, but not on the GPU. */
+.jewel--cpu {
+  background: radial-gradient(circle at 35% 30%, rgba(103, 232, 249, 0.5), rgba(103, 232, 249, 0.15) 65%);
+}
+
 .jewel--no {
   background: radial-gradient(circle at 35% 30%, rgba(244, 240, 234, 0.16), rgba(244, 240, 234, 0.05) 65%);
 }
+
+.quant-table__verdict--partial { color: var(--info, #67e8f9); }
+.quant-table__verdict--cpu { color: var(--ink-low); }
 
 /* In-place expansion */
 .ledger-row__detail {
@@ -1839,6 +1853,115 @@
   font-size: 12px;
   color: var(--ink-mid);
   line-height: 1.55;
+  user-select: text;
+}
+
+/* ── Autonomous tool calls (agentic loop, made visible) ────── */
+
+.toolsteps {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-bottom: 10px;
+}
+
+.toolstep {
+  border-radius: var(--r-el);
+  background: rgba(0, 0, 0, 0.24);
+  box-shadow: inset 2px 0 0 #67e8f9;
+  overflow: hidden;
+}
+
+.toolstep--fail { box-shadow: inset 2px 0 0 var(--sig-warn, #e0a458); }
+
+/* The just-fired call in a live turn pulses until the next event lands. */
+.toolstep--live:last-child { animation: toolPulse 1.4s var(--glide) infinite; }
+
+@keyframes toolPulse {
+  0%, 100% { background: rgba(0, 0, 0, 0.24); }
+  50% { background: rgba(103, 232, 249, 0.07); }
+}
+
+.toolstep__head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 8px 12px;
+  text-align: left;
+  transition: background var(--t-hover) var(--glide);
+}
+
+.toolstep__head:hover { background: rgba(103, 232, 249, 0.05); }
+
+.toolstep__dot {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #67e8f9;
+  box-shadow: 0 0 6px rgba(103, 232, 249, 0.6);
+}
+
+.toolstep__dot--fail {
+  background: var(--sig-warn, #e0a458);
+  box-shadow: 0 0 6px rgba(224, 164, 88, 0.6);
+}
+
+.toolstep__tool {
+  flex: none;
+  font-size: 12px;
+  color: var(--ink-hi);
+}
+
+.toolstep__args {
+  flex: 1;
+  min-width: 0;
+  font-size: 11px;
+  color: var(--ink-low);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.toolstep__chev {
+  flex: none;
+  font-size: 13px;
+  line-height: 1;
+  color: var(--ink-low);
+}
+
+.toolstep__body {
+  padding: 2px 12px 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.toolstep__field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.toolstep__label {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.toolstep__pre {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: var(--r-el);
+  background: rgba(0, 0, 0, 0.3);
+  font-size: 11.5px;
+  color: var(--ink-mid);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 220px;
+  overflow: auto;
   user-select: text;
 }
 

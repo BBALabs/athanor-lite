@@ -14,6 +14,7 @@ import type {
   ChatDelta,
   ChatDone,
   ChatRetrieval,
+  ChatToolEvent,
   Conversation,
   ConversationMeta,
   KnowledgeBase,
@@ -147,6 +148,9 @@ const tauriIpc = {
 
   onChatRetrieval: (handler: (r: ChatRetrieval) => void): Promise<UnlistenFn> =>
     listen<ChatRetrieval>("chat://retrieval", (e) => handler(e.payload)),
+
+  onChatTool: (handler: (t: ChatToolEvent) => void): Promise<UnlistenFn> =>
+    listen<ChatToolEvent>("chat://tool", (e) => handler(e.payload)),
 
   onChatDelta: (handler: (d: ChatDelta) => void): Promise<UnlistenFn> =>
     listen<ChatDelta>("chat://delta", (e) => handler(e.payload)),

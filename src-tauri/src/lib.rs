@@ -597,6 +597,106 @@ fn selftest_mcp(app: &tauri::AppHandle) -> Result<String> {
     ))
 }
 
+/// Agentic self-test: connect a tool server, then ask the model to add two
+/// large numbers. Success requires the model to autonomously call the `add`
+/// tool AND fold its result into the final answer — proving the full loop
+/// (parse → execute → feed back → continue), not just that a tool is reachable.
+#[cfg(debug_assertions)]
+fn selftest_agentic(app: &tauri::AppHandle) -> Result<String> {
+    let model = downloads::ensure_installed(app, "llama-3.2-3b-instruct", "Q4_K_M")?;
+    log::info!("SELFTEST AGENTIC: model ready ({})", model.display_name);
+
+    let ws_list = workspaces::list(app)?;
+    let ws = match ws_list.workspaces.iter().find(|w| w.name == "Agentic Test") {
+        Some(w) => w.clone(),
+        None => workspaces::create(app, "Agentic Test", "autonomous tool use", 155, "A")?,
+    };
+    workspaces::set_active_model(app, &ws.id, Some(model.sha256.clone()))?;
+
+    // Connect the reference server (provides `add`, which sums two numbers).
+    let cfg = mcp::McpServerConfig {
+        id: "everything".into(),
+        name: "Everything (reference)".into(),
+        command: "npx".into(),
+        args: vec!["-y".into(), "@modelcontextprotocol/server-everything".into()],
+        env: Default::default(),
+    };
+    mcp::save_server(app, &ws.id, cfg)?;
+    let mgr = app.state::<McpManager>();
+    let view = mcp::connect(app, &mgr, &ws.id, "everything")?;
+    let tool_names: Vec<String> = view.tools.iter().map(|t| t.name.clone()).collect();
+    log::info!("SELFTEST AGENTIC: {} tools connected: {:?}", view.tools.len(), tool_names);
+    // This server build names its arithmetic tool `get-sum` (older builds used
+    // `add`). Bind to whichever sum tool the connected server actually exposes.
+    let sum_tool = ["get-sum", "add"]
+        .into_iter()
+        .find(|n| tool_names.iter().any(|t| t == n));
+    let Some(sum_tool) = sum_tool else {
+        mcp::disconnect(app, &mgr, "everything");
+        return Err(error::AthanorError::Chat(format!(
+            "reference server exposes no sum tool; got {tool_names:?}"
+        )));
+    };
+    if let Some((_, t)) = mcp::available_tools(&mgr, &ws.id).iter().find(|(_, t)| t.name == sum_tool) {
+        log::info!("SELFTEST AGENTIC: `{sum_tool}` schema = {}", t.input_schema);
+    }
+
+    // A + B chosen so the base model cannot reliably compute it unaided; the
+    // only trustworthy path to the exact answer is the tool.
+    let (a, b) = (40217_i64, 58991_i64);
+    let expected = a + b; // 99208
+    let llm = app.state::<Llm>();
+    let ops = app.state::<Ops>();
+    let conv_id = chat::send(
+        app,
+        &llm,
+        &ops,
+        &ws.id,
+        None,
+        format!(
+            "You have a tool named `{sum_tool}` that returns the sum of two numbers. \
+             Call it to add {a} and {b}, then reply with only the resulting number."
+        ),
+    )?;
+
+    let conv = chat::load(app, &ws.id, &conv_id)?;
+    mcp::disconnect(app, &mgr, "everything");
+
+    let last = conv
+        .messages
+        .last()
+        .ok_or_else(|| error::AthanorError::Chat("no reply saved".into()))?;
+    log::info!(
+        "SELFTEST AGENTIC: tool_steps = {:?}",
+        last.tool_steps
+            .iter()
+            .map(|s| format!("{}({}) ok={} -> {}", s.tool, s.arguments, s.ok, s.result))
+            .collect::<Vec<_>>()
+    );
+    let called_add = last.tool_steps.iter().any(|s| s.tool == sum_tool && s.ok);
+    let answered = last.content.contains(&expected.to_string());
+
+    if !called_add {
+        return Err(error::AthanorError::Chat(format!(
+            "model did not successfully call `{sum_tool}` (tool_steps={:?})",
+            last.tool_steps.iter().map(|s| (&s.tool, s.ok, &s.result)).collect::<Vec<_>>()
+        )));
+    }
+    if !answered {
+        return Err(error::AthanorError::Chat(format!(
+            "tool was called but answer omits {expected}; reply={:?}",
+            last.content.trim().chars().take(120).collect::<String>()
+        )));
+    }
+    Ok(format!(
+        "tool_calls={} called_add={} answer_correct={} reply={:?}",
+        last.tool_steps.len(),
+        called_add,
+        answered,
+        last.content.trim().chars().take(120).collect::<String>()
+    ))
+}
+
 /// Import self-test: scan the machine's real Ollama store, import in place,
 /// verify the imported models appear in the library with valid paths.
 #[cfg(debug_assertions)]
@@ -694,6 +794,7 @@ pub fn run() {
                             "import" => selftest_import(&handle),
                             "rag" => selftest_rag(&handle),
                             "mcp" => selftest_mcp(&handle),
+                            "agentic" => selftest_agentic(&handle),
                             "serve" => {
                                 // Bring the engine up and HOLD — used by the
                                 // orphan-guard test (hard-kill the app, then

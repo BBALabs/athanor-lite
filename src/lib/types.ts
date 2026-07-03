@@ -152,6 +152,8 @@ export interface Catalog {
 
 export type InferenceMode = "gpuFull" | "cpuOnly";
 
+export type FitMode = "gpuFull" | "gpuTight" | "partialOffload" | "cpu" | "exceeds";
+
 export interface Pick {
   entryId: string;
   name: string;
@@ -165,7 +167,19 @@ export interface Pick {
   estMemGb: number;
   headroomGb: number;
   headroomPct: number;
+  fitMode: FitMode;
+  gpuOffloadPct: number | null;
+  maxCtx: number;
   note: string;
+}
+
+export interface QuantFit {
+  entryId: string;
+  quant: string;
+  fitMode: FitMode;
+  estMemGb: number;
+  gpuOffloadPct: number | null;
+  maxCtx: number;
 }
 
 export interface RolePick {
@@ -177,9 +191,15 @@ export interface RecommendationSet {
   mode: InferenceMode;
   computeClass: ComputeClass;
   budgetGb: number;
+  ramBudgetGb: number;
+  gpuCount: number;
+  multiGpu: boolean;
+  vramInUseGb: number;
+  defaultCtx: number;
   best: Pick | null;
   alternates: Pick[];
   byRole: RolePick[];
+  fits: QuantFit[];
   notes: string[];
 }
 
@@ -223,12 +243,21 @@ export interface Source {
   excerpt: string;
 }
 
+export interface ToolStep {
+  server: string;
+  tool: string;
+  arguments: string;
+  result: string;
+  ok: boolean;
+}
+
 export interface ChatMessage {
   role: "user" | "assistant" | string;
   content: string;
   ts: string;
   stats: GenStats | null;
   sources: Source[];
+  toolSteps: ToolStep[];
 }
 
 export type DocStatus = "indexing" | "ready" | "failed";
@@ -254,6 +283,12 @@ export interface ChatRetrieval {
   workspaceId: string;
   conversationId: string;
   sources: Source[];
+}
+
+export interface ChatToolEvent {
+  workspaceId: string;
+  conversationId: string;
+  step: ToolStep;
 }
 
 export interface McpTool {

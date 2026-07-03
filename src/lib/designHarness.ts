@@ -100,10 +100,13 @@ function pickFor(entryId: string, budget: number): Pick | null {
     estMemGb: quant.minMemGb,
     headroomGb,
     headroomPct: (headroomGb / budget) * 100,
+    fitMode: headroomGb >= budget * 0.15 ? "gpuFull" : "gpuTight",
+    gpuOffloadPct: null,
+    maxCtx: e.contextLength,
     note:
       headroomGb >= 8
-        ? `Fits with ${headroomGb.toFixed(0)} GB to spare — room for an embedding model and long context alongside.`
-        : `Comfortable fit with ${headroomGb.toFixed(1)} GB of headroom at 8K context.`,
+        ? `Runs fully on the GPU with ${headroomGb.toFixed(1)} GB to spare — full context.`
+        : `Fits on the GPU with ${headroomGb.toFixed(1)} GB of headroom.`,
   };
 }
 
@@ -124,15 +127,51 @@ function recommendations(): RecommendationSet {
     return best ? [{ role, pick: best }] : [];
   });
 
+  // Fit verdict for every quant (mirrors the Rust decomposition well enough
+  // for design review; the desktop app uses the real backend numbers).
+  const OVERHEAD = 0.5;
+  const fits = catalog.entries.flatMap((e) =>
+    e.quants.map((q) => {
+      const kvPerTok = Math.max(0, q.minMemGb - q.fileGb - OVERHEAD) / 8192;
+      const est = q.fileGb + OVERHEAD + kvPerTok * 8192;
+      let fitMode: Pick["fitMode"];
+      if (est <= budget * 0.85) fitMode = "gpuFull";
+      else if (est <= budget) fitMode = "gpuTight";
+      else if (est <= HW.memory.totalBytes / 1024 ** 3 / 2) fitMode = "partialOffload";
+      else fitMode = "exceeds";
+      const maxCtx =
+        fitMode === "gpuFull" || fitMode === "gpuTight"
+          ? kvPerTok > 0
+            ? Math.min(e.contextLength, Math.floor((budget - q.fileGb - OVERHEAD) / kvPerTok))
+            : e.contextLength
+          : 0;
+      return {
+        entryId: e.id,
+        quant: q.label,
+        fitMode,
+        estMemGb: est,
+        gpuOffloadPct: fitMode === "partialOffload" ? 55 : null,
+        maxCtx,
+      };
+    }),
+  );
+
   return {
     mode: "gpuFull",
     computeClass: HW.computeClass,
     budgetGb: budget,
+    ramBudgetGb: HW.memory.totalBytes / 1024 ** 3 / 2,
+    gpuCount: 1,
+    multiGpu: false,
+    vramInUseGb: (HW.gpus[0].vramUsedBytes ?? 0) / 1024 ** 3,
+    defaultCtx: 8192,
     best: chat[0] ?? null,
     alternates: chat.slice(1, 4),
     byRole,
+    fits,
     notes: [
-      `Budget: ${budget.toFixed(1)} GB usable of 48 GB VRAM (95% usable minus 0.5 GB runtime reserve).`,
+      `Budget: ${budget.toFixed(1)} GB usable of 48 GB VRAM (95% usable minus VRAM in use).`,
+      `Fit shown at 8K context; each pick lists the largest context it can hold.`,
     ],
   };
 }
@@ -147,8 +186,8 @@ let workspaces: Workspace[] = [
     glyph: "◆",
     createdAt: new Date(Date.now() - 86400000 * 12).toISOString(),
     lastOpenedAt: new Date(Date.now() - 3600000 * 2).toISOString(),
-    modelRefs: [],
-    activeModel: null,
+    modelRefs: ["harness-llama-32-3b"],
+    activeModel: "harness-llama-32-3b",
   },
   {
     schema: 1,
@@ -176,13 +215,29 @@ function list(): WorkspaceList {
   return { workspaces: [...workspaces], activeId, damaged: [] };
 }
 
-/* Simulated download machinery — visual behavior only. */
-let harnessLibrary: LibraryModel[] = [];
+/* Simulated download machinery — visual behavior only. One model ships
+   pre-installed and active so the chat room (and its tool chips) can be
+   designed in a browser without walking the install flow. */
+let harnessLibrary: LibraryModel[] = [
+  {
+    schema: 1,
+    sha256: "harness-llama-32-3b",
+    fileName: "llama-3.2-3b-instruct-Q4_K_M.gguf",
+    path: "X:/harness/models/llama-3.2-3b/llama-3.2-3b-instruct-Q4_K_M.gguf",
+    sizeBytes: 2_019_377_000,
+    displayName: "Llama 3.2 3B Instruct",
+    entryId: "llama-3.2-3b-instruct",
+    quant: "Q4_K_M",
+    source: "huggingface",
+    addedAt: new Date(Date.now() - 86400000 * 3).toISOString(),
+  },
+];
 const harnessTimers: Record<string, number> = {};
 let onProgress: ((p: DownloadProgress) => void) | null = null;
 const harnessConvs: Conversation[] = [];
 let onChatDeltaHandler: ((d: ChatDelta) => void) | null = null;
 let onChatDoneHandler: ((d: ChatDone) => void) | null = null;
+let onChatToolHandler: ((t: unknown) => void) | null = null;
 let onOpsHandler: ((ops: Operation[]) => void) | null = null;
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -355,7 +410,24 @@ export const harnessIpc = {
       };
       harnessConvs.unshift(conv);
     }
-    conv.messages.push({ role: "user", content: message, ts: new Date().toISOString(), stats: null, sources: [] });
+    conv.messages.push({ role: "user", content: message, ts: new Date().toISOString(), stats: null, sources: [], toolSteps: [] });
+
+    // Canned tool call so the agentic UI (tool chips) can be styled in a browser.
+    const toolSteps = [
+      {
+        server: "everything",
+        tool: "get-sum",
+        arguments: '{"a":40217,"b":58991}',
+        result: "The sum of 40217 and 58991 is 99208.",
+        ok: true,
+      },
+    ];
+    await new Promise((r) => setTimeout(r, 320));
+    for (const step of toolSteps) {
+      onChatToolHandler?.({ workspaceId, conversationId: id, step });
+      await new Promise((r) => setTimeout(r, 260));
+    }
+
     const reply =
       "This is the **design harness** — a canned reply so the room can be styled.\n\n```rust\nfn ignition() {\n    println!(\"the machine speaks\");\n}\n```\nEverything here would stream token by token from llama.cpp in the desktop app.";
     const words = reply.split(/(?<=\s)/);
@@ -375,7 +447,7 @@ export const harnessIpc = {
       gpuActive: true,
       cancelled: false,
     };
-    conv.messages.push({ role: "assistant", content: acc, ts: new Date().toISOString(), stats, sources: [] });
+    conv.messages.push({ role: "assistant", content: acc, ts: new Date().toISOString(), stats, sources: [], toolSteps });
     conv.updatedAt = new Date().toISOString();
     onChatDoneHandler?.({ workspaceId, conversationId: id, content: acc, stats, error: null });
     return id;
@@ -497,6 +569,12 @@ export const harnessIpc = {
     }
   },
   onChatRetrieval: async (_handler: (r: unknown) => void) => () => {},
+  onChatTool: async (handler: (t: unknown) => void) => {
+    onChatToolHandler = handler;
+    return () => {
+      onChatToolHandler = null;
+    };
+  },
 
   listOperations: async () => harnessOps(),
   cancelOperation: async (id: string) => {

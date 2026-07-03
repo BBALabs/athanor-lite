@@ -122,16 +122,24 @@ The catalog is **curated, not scraped**: a reviewed list of GGUF models embedded
 
 **Recommendation algorithm** (pure function, unit-tested):
 
-1. Compute the memory budget: largest single GPU VRAM × 0.95 − 0.5 GB runtime reserve
-   (constants live in `models/recommend.rs` — this document defers to code);
-   CPU-only machines get RAM × 0.5 and a "CPU inference" flag with tempered expectations.
-2. For every catalog entry, pick the best quant that fits the budget (prefer Q4_K_M+; refuse
-   quants below Q3 as quality-misleading).
-3. **Best single model** = highest quality entry that fits. **Alternates** = next three.
+1. Compute the memory budget honestly. The recommender **sums every NVIDIA GPU** (VRAM ×
+   0.95 each) and **subtracts VRAM already in use** by other processes — so a dual-card
+   workstation is scoped for tensor-split, and a machine already running something isn't
+   promised memory it doesn't have. CPU-only machines get RAM × 0.5 and a "CPU inference"
+   flag with tempered expectations. Constants live in `models/recommend.rs`.
+2. **Fit is context-aware.** Each catalog footprint is decomposed into weights + KV-cache
+   (per-token, derived from the 8K reference floor) + overhead, so memory is projected at
+   the *actual* context length rather than a fixed 8K. Every quant gets one of five verdicts:
+   `GpuFull` (fits with comfortable headroom), `GpuTight` (fits, thin headroom),
+   `PartialOffload` (near-fit → CPU+GPU split, with the GPU-offload % the runtime should use),
+   `Cpu`, or `Exceeds`. **"Tight" is never over budget** — an OOM crash is `Exceeds`, not tight.
+3. For every entry, pick the best quant that is *runnable* (prefer Q4_K_M+; refuse sub-Q3 as
+   quality-misleading). **Best single model** = highest quality that fits; **Alternates** = next three.
 4. **Per-role picks** = best fitting entry per role tag, so a workspace wizard can propose
    "your machine's best coding stack" instantly.
-5. Every pick carries fit metadata: projected VRAM at 8K context, headroom %, and a plain-
-   English note ("fits with 31 GB to spare — room for an embedding model alongside").
+5. The backend emits a `fits` table — one verdict per catalog quant — that is the **single
+   source of truth** the UI reads; the frontend never re-derives fit. Every number a power
+   user sees (budget, in-use VRAM, GPU count, projected memory, max context) is trustworthy.
 
 ## 6. Workspace system
 
@@ -240,9 +248,25 @@ JSON-RPC 2.0 on the server's stdio (stderr is logs only); handshake is
 `initialize` (protocol 2025-11-25) → `notifications/initialized` → `tools/list`,
 with `tools/call` available. Each server is a child process under the same
 guarantees as the engine: job-object bound (dies with the app), registered in
-the operations registry, duplicate-connection-proof, killed on exit. Connected
-tools are advertised to the model in the chat system prompt; autonomous
-tool-invocation from the generation loop is a future milestone.
+the operations registry, duplicate-connection-proof, killed on exit.
+
+**The agentic loop.** Connected MCP tools are converted to OpenAI function
+definitions and sent with each generation (`tool_choice: auto`). The chat backend
+runs a bounded multi-round loop: stream a turn while accumulating both content
+deltas and tool-call fragments (assembled by streamed `index`); when the model
+emits tool calls, execute each against the owning server via `tools/call`, append
+the results as `role: "tool"` messages, and loop — up to a `MAX_TOOL_ROUNDS`
+backstop. Two robustness measures make this reliable across models: **schema-aware
+argument coercion** (models routinely stringify numeric/boolean args — `{"a":"40217"}`
+where the tool wants a number — so arguments are healed against the tool's declared
+input schema before the call), and **self-correcting feedback** (an unknown tool name,
+common with small models, returns the list of valid names so the model recovers next
+round instead of looping). Every call is surfaced as a first-class `ToolStep`
+(server, tool, the actually-sent arguments, result, ok) — streamed live to the UI as
+`chat://tool` events and persisted on the assistant message, so the user sees exactly
+what was called, with what, and what came back. Verified end-to-end on-device: the
+model autonomously calls a sum tool with coerced arguments and folds the result into
+its answer.
 
 ## 8. Reliability, security, logging
 

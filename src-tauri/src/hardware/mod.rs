@@ -99,17 +99,6 @@ pub struct HardwareReport {
 }
 
 impl HardwareReport {
-    /// VRAM of the largest single GPU, in GiB. Multi-GPU splits are an M2+
-    /// concern; recommendations stay honest by assuming one device.
-    pub fn max_gpu_vram_gb(&self) -> f64 {
-        self.gpus
-            .iter()
-            .filter_map(|g| g.vram_total_bytes)
-            .max()
-            .map(|b| b as f64 / GIB)
-            .unwrap_or(0.0)
-    }
-
     pub fn ram_gb(&self) -> f64 {
         self.memory.total_bytes as f64 / GIB
     }

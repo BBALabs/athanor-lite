@@ -48,6 +48,10 @@ pub struct McpTool {
     pub name: String,
     pub title: Option<String>,
     pub description: Option<String>,
+    /// JSON-Schema for the tool's arguments — passed to the model as the
+    /// function `parameters` so it can call the tool correctly.
+    #[serde(skip)]
+    pub input_schema: Value,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -344,6 +348,10 @@ fn do_connect(
                         .get("description")
                         .and_then(|n| n.as_str())
                         .map(|s| s.to_string()),
+                    input_schema: t
+                        .get("inputSchema")
+                        .cloned()
+                        .unwrap_or_else(|| json!({ "type": "object", "properties": {} })),
                 });
             }
         }
