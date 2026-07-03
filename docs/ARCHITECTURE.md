@@ -208,6 +208,42 @@ Multi-step flows (onboarding today; RAG/fine-tune wizards later) must be
 skippable and back-out-able at every step, and any long step they trigger
 goes through the registry like everything else.
 
+## 7c. Knowledge (RAG) and tools (MCP) — M3
+
+**RAG.** Each workspace has a knowledge base at `workspaces/<id>/rag/`: a
+schema-versioned `knowledge.json` manifest (the document list, status, counts —
+source of truth for the UI) and a per-workspace **LanceDB** database (`rag/lance`,
+table `chunks`) holding vectors + text. Pipeline: extract text
+(txt/md/code as UTF-8, PDF via `pdf-extract`, DOCX by parsing `word/document.xml`)
+→ paragraph-aware chunk with overlap → embed → store. Indexing is a registered,
+cancellable operation with per-chunk progress.
+
+Embeddings come from a **dedicated `llama-server`** running nomic-embed-text-v1.5
+in `--embeddings --pooling mean` mode on its own port, coexisting with the chat
+engine (the embed model is ~0.3 GB). It reuses the entire runtime substrate: the
+pinned llama.cpp build, the job object (no orphans), the operations registry,
+and serialized bring-up. The nomic task prefixes are mandatory and applied here:
+`search_document:` on stored chunks, `search_query:` on the query — omitting them
+silently wrecks retrieval. Vectors are L2-normalized by the server, so LanceDB's
+L2 nearest-neighbor ranking equals cosine ordering; a cosine similarity score
+(`1 − L2²/2`) is reported for display.
+
+At chat time (`retrieve`): embed the latest user turn, pull top-k chunks above a
+similarity floor, inject them as a system message, and **surface the sources** —
+which documents, which chunk indices, what score — as a first-class output. The
+UI shows retrieval running before tokens and lists the sources under the reply.
+Retrieval failure never blocks chatting; retrieval can be toggled per workspace.
+
+**MCP.** Workspaces connect to external tools over the Model Context Protocol
+(`mcp/servers.json` per workspace). Transport is newline-delimited compact
+JSON-RPC 2.0 on the server's stdio (stderr is logs only); handshake is
+`initialize` (protocol 2025-11-25) → `notifications/initialized` → `tools/list`,
+with `tools/call` available. Each server is a child process under the same
+guarantees as the engine: job-object bound (dies with the app), registered in
+the operations registry, duplicate-connection-proof, killed on exit. Connected
+tools are advertised to the model in the chat system prompt; autonomous
+tool-invocation from the generation loop is a future milestone.
+
 ## 8. Reliability, security, logging
 
 - **Sandboxing:** Tauri capability system pinned to the minimum (window controls, events,

@@ -7,6 +7,7 @@ import { Onboarding } from "./components/Onboarding";
 import { OpsDrawer } from "./components/OpsDrawer";
 import { SettingsSheet } from "./components/SettingsSheet";
 import { Chat } from "./views/Chat";
+import { Knowledge } from "./views/Knowledge";
 import { Dashboard } from "./views/Dashboard";
 import { Models } from "./views/Models";
 import { Workspaces } from "./views/Workspaces";
@@ -135,6 +136,7 @@ export default function App() {
           {boot === "ready" && (
             <>
               {view === "chat" && <Chat />}
+              {view === "knowledge" && <Knowledge />}
               {view === "dashboard" && <Dashboard />}
               {view === "models" && <Models />}
               {view === "workspaces" && <Workspaces />}

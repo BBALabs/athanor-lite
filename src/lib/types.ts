@@ -215,11 +215,67 @@ export interface GenStats {
   cancelled: boolean;
 }
 
+export interface Source {
+  docId: string;
+  docName: string;
+  chunkIndex: number;
+  score: number;
+  excerpt: string;
+}
+
 export interface ChatMessage {
   role: "user" | "assistant" | string;
   content: string;
   ts: string;
   stats: GenStats | null;
+  sources: Source[];
+}
+
+export type DocStatus = "indexing" | "ready" | "failed";
+
+export interface KbDocument {
+  id: string;
+  name: string;
+  sourcePath: string;
+  bytes: number;
+  chunkCount: number;
+  status: DocStatus;
+  error: string | null;
+  addedAt: string;
+}
+
+export interface KnowledgeBase {
+  documents: KbDocument[];
+  retrievalEnabled: boolean;
+  chunkTotal: number;
+}
+
+export interface ChatRetrieval {
+  workspaceId: string;
+  conversationId: string;
+  sources: Source[];
+}
+
+export interface McpTool {
+  name: string;
+  title: string | null;
+  description: string | null;
+}
+
+export interface McpServerConfig {
+  id: string;
+  name: string;
+  command: string;
+  args: string[];
+  env: Record<string, string>;
+}
+
+export interface McpServerView {
+  config: McpServerConfig;
+  connected: boolean;
+  serverName: string | null;
+  tools: McpTool[];
+  error: string | null;
 }
 
 export interface Conversation {
@@ -326,7 +382,14 @@ export interface ApiInfo {
   modelName: string | null;
 }
 
-export type OpKind = "download" | "engineFetch" | "engine" | "generation" | "import";
+export type OpKind =
+  | "download"
+  | "engineFetch"
+  | "engine"
+  | "generation"
+  | "import"
+  | "index"
+  | "mcp";
 export type OpState = "running" | "failed" | "cancelled";
 
 export interface Operation {

@@ -7,17 +7,20 @@ import {
   type ConversationMeta,
   type DownloadProgress,
   type HardwareReport,
+  type KnowledgeBase,
   type LibraryModel,
+  type McpServerView,
   type Operation,
   type RecommendationSet,
   type RuntimeState,
   type ServerStatus,
+  type Source,
   type TelemetrySample,
   type Workspace,
   type WorkspaceList,
 } from "../lib/types";
 
-export type View = "chat" | "dashboard" | "models" | "workspaces";
+export type View = "chat" | "knowledge" | "dashboard" | "models" | "workspaces";
 
 const PENDING_CONV = "pending";
 export type BootPhase = "booting" | "ready" | "error";
@@ -63,9 +66,25 @@ interface AthanorStore {
   operations: Operation[];
   opsOpen: boolean;
 
+  // Knowledge base + MCP (per active workspace)
+  knowledge: KnowledgeBase | null;
+  mcpServers: McpServerView[];
+  /** Live retrieval sources for the in-flight generation, before it finishes. */
+  liveSources: Source[];
+
   setView: (v: View) => void;
   dismissOnboarding: () => void;
   setOpsOpen: (open: boolean) => void;
+  loadKnowledge: () => Promise<void>;
+  addDocuments: (paths: string[]) => Promise<void>;
+  removeDocument: (docId: string) => Promise<void>;
+  cancelIndexing: (docId: string) => Promise<void>;
+  setRetrievalEnabled: (enabled: boolean) => Promise<void>;
+  loadMcpServers: () => Promise<void>;
+  saveMcpServer: (config: McpServerView["config"]) => Promise<void>;
+  connectMcpServer: (serverId: string) => Promise<void>;
+  disconnectMcpServer: (serverId: string) => Promise<void>;
+  removeMcpServer: (serverId: string) => Promise<void>;
   cancelOperation: (id: string) => Promise<void>;
   dismissOperation: (id: string) => Promise<void>;
   retryOperation: (id: string) => Promise<void>;
@@ -131,10 +150,124 @@ export const useStore = create<AthanorStore>((set, get) => ({
   onboardingNeeded: false,
   operations: [],
   opsOpen: false,
+  knowledge: null,
+  mcpServers: [],
+  liveSources: [],
 
   setView: (view) => set({ view }),
   dismissOnboarding: () => set({ onboardingNeeded: false }),
   setOpsOpen: (opsOpen) => set({ opsOpen }),
+
+  loadKnowledge: async () => {
+    const wsId = get().workspaces.activeId;
+    if (!wsId) {
+      set({ knowledge: null });
+      return;
+    }
+    try {
+      set({ knowledge: await ipc.getKnowledgeBase(wsId) });
+    } catch (e) {
+      console.error("knowledge base unavailable", e);
+    }
+  },
+
+  addDocuments: async (paths) => {
+    const wsId = get().workspaces.activeId;
+    if (!wsId || paths.length === 0) return;
+    try {
+      // Fire and forget — progress arrives via the operations registry; the
+      // knowledge base refreshes as each document's op completes.
+      void ipc.addDocuments(wsId, paths);
+    } catch (e) {
+      set({ lastOpError: errText(e) });
+    }
+  },
+
+  removeDocument: async (docId) => {
+    const wsId = get().workspaces.activeId;
+    if (!wsId) return;
+    try {
+      set({ knowledge: await ipc.removeDocument(wsId, docId) });
+    } catch (e) {
+      set({ lastOpError: errText(e) });
+    }
+  },
+
+  cancelIndexing: async (docId) => {
+    const wsId = get().workspaces.activeId;
+    if (!wsId) return;
+    try {
+      await ipc.cancelIndexing(wsId, docId);
+    } catch (e) {
+      set({ lastOpError: errText(e) });
+    }
+  },
+
+  setRetrievalEnabled: async (enabled) => {
+    const wsId = get().workspaces.activeId;
+    if (!wsId) return;
+    try {
+      set({ knowledge: await ipc.setRetrievalEnabled(wsId, enabled) });
+    } catch (e) {
+      set({ lastOpError: errText(e) });
+    }
+  },
+
+  loadMcpServers: async () => {
+    const wsId = get().workspaces.activeId;
+    if (!wsId) {
+      set({ mcpServers: [] });
+      return;
+    }
+    try {
+      set({ mcpServers: await ipc.listMcpServers(wsId) });
+    } catch (e) {
+      console.error("mcp servers unavailable", e);
+    }
+  },
+
+  saveMcpServer: async (config) => {
+    const wsId = get().workspaces.activeId;
+    if (!wsId) return;
+    try {
+      set({ mcpServers: await ipc.saveMcpServer(wsId, config) });
+    } catch (e) {
+      set({ lastOpError: errText(e) });
+    }
+  },
+
+  connectMcpServer: async (serverId) => {
+    const wsId = get().workspaces.activeId;
+    if (!wsId) return;
+    try {
+      await ipc.connectMcpServer(wsId, serverId);
+      set({ mcpServers: await ipc.listMcpServers(wsId) });
+    } catch (e) {
+      set({ lastOpError: errText(e) });
+      void get().loadMcpServers();
+    }
+  },
+
+  disconnectMcpServer: async (serverId) => {
+    const wsId = get().workspaces.activeId;
+    if (!wsId) return;
+    try {
+      await ipc.disconnectMcpServer(serverId);
+      set({ mcpServers: await ipc.listMcpServers(wsId) });
+    } catch (e) {
+      set({ lastOpError: errText(e) });
+    }
+  },
+
+  removeMcpServer: async (serverId) => {
+    const wsId = get().workspaces.activeId;
+    if (!wsId) return;
+    try {
+      set({ mcpServers: await ipc.removeMcpServer(wsId, serverId) });
+    } catch (e) {
+      set({ lastOpError: errText(e) });
+    }
+  },
 
   cancelOperation: async (id) => {
     try {
@@ -268,13 +401,32 @@ export const useStore = create<AthanorStore>((set, get) => ({
       });
       await ipc.onChatDone((d) => {
         if (d.error) set({ lastOpError: d.error });
+        set({ liveSources: [] });
+      });
+      await ipc.onChatRetrieval((r) => {
+        // Only for the active conversation's in-flight turn.
+        if (get().activeConv?.id === r.conversationId || get().generating) {
+          set({ liveSources: r.sources });
+        }
       });
       await ipc.onRuntimeState((runtimeState) => set({ runtimeState }));
       await ipc.onServerStatus((serverStatus) => set({ serverStatus }));
-      await ipc.onOpsChanged((operations) => set({ operations }));
+      let prevOps: Operation[] = [];
+      await ipc.onOpsChanged((operations) => {
+        // When an index/import op clears, the knowledge base changed — refresh.
+        const hadIndex = prevOps.some((o) => o.kind === "index" || o.kind === "import");
+        const hasIndex = operations.some((o) => o.kind === "index" || o.kind === "import");
+        if (hadIndex && !hasIndex) void get().loadKnowledge();
+        prevOps = operations;
+        set({ operations });
+      });
       set({ operations: await ipc.listOperations() });
       const ws = get().workspaces;
-      if (ws.activeId) await get().loadConversations();
+      if (ws.activeId) {
+        await get().loadConversations();
+        void get().loadKnowledge();
+        void get().loadMcpServers();
+      }
     } catch (e) {
       console.error("chat streams unavailable", e);
     }
@@ -394,7 +546,7 @@ export const useStore = create<AthanorStore>((set, get) => ({
     };
     const optimistic: Conversation = {
       ...base,
-      messages: [...base.messages, { role: "user", content: text, ts: now, stats: null }],
+      messages: [...base.messages, { role: "user", content: text, ts: now, stats: null, sources: [] }],
       updatedAt: now,
     };
     set({ activeConv: optimistic, generating: true, streamText: "" });

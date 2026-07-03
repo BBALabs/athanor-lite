@@ -57,7 +57,16 @@ Already in place:
 
 ## 3. Building a release
 
+**Build prerequisite (RAG/LanceDB):** the Rust build needs `protoc` (protobuf
+compiler) available at build time — LanceDB's `lance-*` crates compile protobuf
+definitions. It is **build-time only**; the shipped binary embeds LanceDB with
+no runtime dependency. Install once (any of: `winget install protobuf`, the
+prebuilt binary from github.com/protocolbuffers/protobuf/releases, or a package
+manager) and set `PROTOC` to its path, e.g.
+`$env:PROTOC = "$env:USERPROFILE\.local\protoc\bin\protoc.exe"`.
+
 ```powershell
+$env:PROTOC = "<path-to-protoc.exe>"
 $env:TAURI_SIGNING_PRIVATE_KEY_PATH = "$env:USERPROFILE\.athanor-release\updater.key"
 npm run tauri build          # produces installer + .sig updater artifacts
 ```
@@ -69,6 +78,8 @@ cd src-tauri; cargo test; cargo clippy --all-targets   # zero warnings
 cd ..; npm run build                                   # tsc clean
 $env:ATHANOR_SELFTEST="chat";   npm run tauri dev      # SELFTEST PASS
 $env:ATHANOR_SELFTEST="import"; npm run tauri dev      # SELFTEST PASS
+$env:ATHANOR_SELFTEST="rag";    npm run tauri dev      # index→embed→retrieve→cited answer PASS
+$env:ATHANOR_SELFTEST="mcp";    npm run tauri dev      # connect server-everything, echo tool PASS
 # Orphan guard: ATHANOR_SELFTEST=serve, then `taskkill /F /IM athanor.exe`,
 # then verify: Get-Process llama-server → must be empty.
 ```

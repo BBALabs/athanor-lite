@@ -32,6 +32,16 @@ export function MarkIcon(props: IconProps) {
   );
 }
 
+/** Knowledge: an open book — the workspace's documents. */
+export function KnowledgeIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M12 6.5c-1.8-1.4-4-1.6-6.5-1.4v11c2.5-.2 4.7 0 6.5 1.4 1.8-1.4 4-1.6 6.5-1.4v-11c-2.5-.2-4.7 0-6.5 1.4Z" />
+      <path d="M12 6.5v11" strokeOpacity={0.55} />
+    </svg>
+  );
+}
+
 /** Chat: a console line — the prompt caret and the machine's reply. */
 export function ChatIcon(props: IconProps) {
   return (

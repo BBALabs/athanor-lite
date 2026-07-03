@@ -2,21 +2,143 @@ mod chat;
 mod downloads;
 mod error;
 mod hardware;
+mod mcp;
 mod metrics;
 mod models;
 mod ops;
+mod rag;
 mod runtime;
 mod workspaces;
 
 use downloads::LibraryModel;
 use error::Result;
 use hardware::HardwareReport;
+use mcp::McpManager;
 use models::recommend::RecommendationSet;
 use models::Catalog;
 use ops::Ops;
+use rag::embed::Embedder;
 use runtime::server::Llm;
 use tauri::Manager;
 use workspaces::{Workspace, WorkspaceList, WsLock};
+
+// ── Knowledge base (RAG) commands ─────────────────────────────
+
+#[tauri::command]
+fn get_knowledge_base(app: tauri::AppHandle, workspace_id: String) -> Result<rag::KnowledgeBase> {
+    rag::knowledge_base(&app, &workspace_id)
+}
+
+#[tauri::command]
+async fn add_documents(
+    app: tauri::AppHandle,
+    workspace_id: String,
+    paths: Vec<String>,
+) -> Result<()> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let embedder = app.state::<Embedder>();
+        for path in paths {
+            // Each document is its own registered, cancellable operation.
+            if let Err(e) = rag::add_document(&app, &embedder, &workspace_id, &path) {
+                log::warn!(target: "rag", "index of {path} ended: {e}");
+            }
+        }
+        Ok(())
+    })
+    .await
+    .map_err(|e| error::AthanorError::Rag(format!("indexing task failed: {e}")))?
+}
+
+#[tauri::command]
+fn cancel_indexing(app: tauri::AppHandle, workspace_id: String, doc_id: String) {
+    rag::cancel_indexing(&app, &workspace_id, &doc_id);
+}
+
+#[tauri::command]
+fn remove_document(
+    app: tauri::AppHandle,
+    workspace_id: String,
+    doc_id: String,
+) -> Result<rag::KnowledgeBase> {
+    rag::remove_document(&app, &workspace_id, &doc_id)
+}
+
+#[tauri::command]
+fn set_retrieval_enabled(
+    app: tauri::AppHandle,
+    workspace_id: String,
+    enabled: bool,
+) -> Result<rag::KnowledgeBase> {
+    rag::set_retrieval_enabled(&app, &workspace_id, enabled)
+}
+
+#[tauri::command]
+async fn preview_chunks(
+    app: tauri::AppHandle,
+    workspace_id: String,
+    doc_id: String,
+) -> Result<Vec<rag::Source>> {
+    tauri::async_runtime::spawn_blocking(move || rag::preview_chunks(&app, &workspace_id, &doc_id))
+        .await
+        .map_err(|e| error::AthanorError::Rag(format!("preview task failed: {e}")))?
+}
+
+#[tauri::command]
+fn stop_embedder(app: tauri::AppHandle, embedder: tauri::State<'_, Embedder>) {
+    rag::embed::stop(&app, &embedder);
+}
+
+// ── MCP commands ──────────────────────────────────────────────
+
+#[tauri::command]
+fn list_mcp_servers(
+    app: tauri::AppHandle,
+    workspace_id: String,
+) -> Result<Vec<mcp::McpServerView>> {
+    mcp::list_servers(&app, &workspace_id)
+}
+
+#[tauri::command]
+fn save_mcp_server(
+    app: tauri::AppHandle,
+    workspace_id: String,
+    config: mcp::McpServerConfig,
+) -> Result<Vec<mcp::McpServerView>> {
+    mcp::save_server(&app, &workspace_id, config)
+}
+
+#[tauri::command]
+fn remove_mcp_server(
+    app: tauri::AppHandle,
+    mgr: tauri::State<'_, McpManager>,
+    workspace_id: String,
+    server_id: String,
+) -> Result<Vec<mcp::McpServerView>> {
+    mcp::remove_server(&app, &mgr, &workspace_id, &server_id)
+}
+
+#[tauri::command]
+async fn connect_mcp_server(
+    app: tauri::AppHandle,
+    workspace_id: String,
+    server_id: String,
+) -> Result<mcp::McpServerView> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let mgr = app.state::<McpManager>();
+        mcp::connect(&app, &mgr, &workspace_id, &server_id)
+    })
+    .await
+    .map_err(|e| error::AthanorError::Mcp(format!("connect task failed: {e}")))?
+}
+
+#[tauri::command]
+fn disconnect_mcp_server(
+    app: tauri::AppHandle,
+    mgr: tauri::State<'_, McpManager>,
+    server_id: String,
+) {
+    mcp::disconnect(&app, &mgr, &server_id);
+}
 
 #[tauri::command]
 async fn chat_send(
@@ -386,6 +508,95 @@ fn selftest_serve(app: &tauri::AppHandle) -> Result<String> {
     Ok(format!("engine on port {port}"))
 }
 
+/// RAG self-test: index a document with a unique fact, retrieve it, and
+/// confirm the model answers from the retrieved context with the source.
+#[cfg(debug_assertions)]
+fn selftest_rag(app: &tauri::AppHandle) -> Result<String> {
+    use std::io::Write;
+    // A fact the base model cannot know — proves retrieval, not memorization.
+    let secret = "The Athanor calibration constant for the Meridian reactor is 8827 kelvin-seconds.";
+    let dir = std::env::temp_dir().join("athanor-rag-selftest");
+    std::fs::create_dir_all(&dir)?;
+    let doc = dir.join("meridian-notes.txt");
+    let mut f = std::fs::File::create(&doc)?;
+    writeln!(
+        f,
+        "Meridian Reactor Field Notes\n\nGeneral background about the facility and its history.\n\n{secret}\n\nAdditional unrelated maintenance logs follow."
+    )?;
+
+    let model = downloads::ensure_installed(app, "llama-3.2-3b-instruct", "Q4_K_M")?;
+    let ws_list = workspaces::list(app)?;
+    let ws = match ws_list.workspaces.iter().find(|w| w.name == "RAG Test") {
+        Some(w) => w.clone(),
+        None => workspaces::create(app, "RAG Test", "Meridian reactor documentation", 200, "R")?,
+    };
+    workspaces::set_active_model(app, &ws.id, Some(model.sha256.clone()))?;
+
+    let embedder = app.state::<Embedder>();
+    let indexed = rag::add_document(app, &embedder, &ws.id, &doc.to_string_lossy())?;
+    log::info!("SELFTEST RAG: indexed {} chunks", indexed.chunk_count);
+
+    // Retrieval alone must surface the secret chunk.
+    let (block, sources) = rag::retrieve(app, &embedder, &ws.id, "What is the calibration constant for the Meridian reactor?")?;
+    if !block.contains("8827") {
+        return Err(error::AthanorError::Rag(format!(
+            "retrieval did not surface the fact; sources={sources:?}"
+        )));
+    }
+
+    // End to end: the model answers from context.
+    let llm = app.state::<Llm>();
+    let ops = app.state::<Ops>();
+    let conv_id = chat::send(
+        app,
+        &llm,
+        &ops,
+        &ws.id,
+        None,
+        "What is the calibration constant for the Meridian reactor? Answer with the number.".into(),
+    )?;
+    let conv = chat::load(app, &ws.id, &conv_id)?;
+    let last = conv.messages.last().ok_or_else(|| error::AthanorError::Rag("no reply".into()))?;
+    let answered = last.content.contains("8827");
+    Ok(format!(
+        "indexed={} retrieved_sources={} answer_contains_fact={} sources={:?} reply={:?}",
+        indexed.chunk_count,
+        sources.len(),
+        answered,
+        sources.iter().map(|s| (&s.doc_name, s.chunk_index, s.score)).collect::<Vec<_>>(),
+        last.content.trim().chars().take(120).collect::<String>()
+    ))
+}
+
+/// MCP self-test: launch the reference server-everything over stdio, connect,
+/// list tools, and call `echo`.
+#[cfg(debug_assertions)]
+fn selftest_mcp(app: &tauri::AppHandle) -> Result<String> {
+    let ws_list = workspaces::list(app)?;
+    let ws = match ws_list.workspaces.iter().find(|w| w.name == "MCP Test") {
+        Some(w) => w.clone(),
+        None => workspaces::create(app, "MCP Test", "tool connectivity", 25, "M")?,
+    };
+    let cfg = mcp::McpServerConfig {
+        id: "everything".into(),
+        name: "Everything (reference)".into(),
+        command: "npx".into(),
+        args: vec!["-y".into(), "@modelcontextprotocol/server-everything".into()],
+        env: Default::default(),
+    };
+    mcp::save_server(app, &ws.id, cfg)?;
+    let mgr = app.state::<McpManager>();
+    let view = mcp::connect(app, &mgr, &ws.id, "everything")?;
+    let echo = mcp::call_tool(&mgr, "everything", "echo", serde_json::json!({ "message": "hello" }))?;
+    mcp::disconnect(app, &mgr, "everything");
+    Ok(format!(
+        "server={:?} tools={} echo={:?}",
+        view.server_name,
+        view.tools.len(),
+        echo.trim()
+    ))
+}
+
 /// Import self-test: scan the machine's real Ollama store, import in place,
 /// verify the imported models appear in the library with valid paths.
 #[cfg(debug_assertions)]
@@ -425,6 +636,7 @@ pub fn run() {
             }
         }))
         .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_dialog::init())
         .plugin(
             tauri_plugin_log::Builder::new()
                 .level(log::LevelFilter::Info)
@@ -441,6 +653,8 @@ pub fn run() {
         .manage(WsLock::default())
         .manage(Llm::default())
         .manage(Ops::default())
+        .manage(Embedder::default())
+        .manage(McpManager::default())
         .setup(|app| {
             let handle = app.handle().clone();
             if let Err(e) = std::thread::Builder::new()
@@ -478,6 +692,8 @@ pub fn run() {
                         let result = match mode.as_str() {
                             "chat" => selftest_chat(&handle),
                             "import" => selftest_import(&handle),
+                            "rag" => selftest_rag(&handle),
+                            "mcp" => selftest_mcp(&handle),
                             "serve" => {
                                 // Bring the engine up and HOLD — used by the
                                 // orphan-guard test (hard-kill the app, then
@@ -552,20 +768,34 @@ pub fn run() {
             list_operations,
             cancel_operation,
             dismiss_operation,
-            retry_operation
+            retry_operation,
+            get_knowledge_base,
+            add_documents,
+            cancel_indexing,
+            remove_document,
+            set_retrieval_enabled,
+            preview_chunks,
+            stop_embedder,
+            list_mcp_servers,
+            save_mcp_server,
+            remove_mcp_server,
+            connect_mcp_server,
+            disconnect_mcp_server
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|app, event| {
-            // The engine must never outlive the app.
+            // No child — engine, embedder, or MCP server — outlives the app.
+            // (The job object is the hard guarantee; this is the clean path.)
             if let tauri::RunEvent::Exit = event {
                 let llm = app.state::<Llm>();
-                let mut guard = llm.lock();
-                if let Some(mut active) = guard.take() {
+                if let Some(mut active) = llm.lock().take() {
                     log::info!(target: "rt", "app exit: stopping llama-server");
                     let _ = active.child.kill();
                     let _ = active.child.wait();
                 }
+                rag::embed::stop(app, &app.state::<Embedder>());
+                mcp::shutdown_all(&app.state::<McpManager>());
             }
         });
 }

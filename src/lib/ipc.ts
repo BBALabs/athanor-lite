@@ -13,8 +13,13 @@ import type {
   Catalog,
   ChatDelta,
   ChatDone,
+  ChatRetrieval,
   Conversation,
   ConversationMeta,
+  KnowledgeBase,
+  McpServerConfig,
+  McpServerView,
+  Source,
   DownloadProgress,
   HardwareReport,
   ImportReport,
@@ -113,6 +118,36 @@ const tauriIpc = {
       "check_for_update",
     ),
 
+  // ── Knowledge base (RAG) ──
+  getKnowledgeBase: (workspaceId: string) =>
+    invoke<KnowledgeBase>("get_knowledge_base", { workspaceId }),
+  addDocuments: (workspaceId: string, paths: string[]) =>
+    invoke<void>("add_documents", { workspaceId, paths }),
+  cancelIndexing: (workspaceId: string, docId: string) =>
+    invoke<void>("cancel_indexing", { workspaceId, docId }),
+  removeDocument: (workspaceId: string, docId: string) =>
+    invoke<KnowledgeBase>("remove_document", { workspaceId, docId }),
+  setRetrievalEnabled: (workspaceId: string, enabled: boolean) =>
+    invoke<KnowledgeBase>("set_retrieval_enabled", { workspaceId, enabled }),
+  previewChunks: (workspaceId: string, docId: string) =>
+    invoke<Source[]>("preview_chunks", { workspaceId, docId }),
+  stopEmbedder: () => invoke<void>("stop_embedder"),
+
+  // ── MCP ──
+  listMcpServers: (workspaceId: string) =>
+    invoke<McpServerView[]>("list_mcp_servers", { workspaceId }),
+  saveMcpServer: (workspaceId: string, config: McpServerConfig) =>
+    invoke<McpServerView[]>("save_mcp_server", { workspaceId, config }),
+  removeMcpServer: (workspaceId: string, serverId: string) =>
+    invoke<McpServerView[]>("remove_mcp_server", { workspaceId, serverId }),
+  connectMcpServer: (workspaceId: string, serverId: string) =>
+    invoke<McpServerView>("connect_mcp_server", { workspaceId, serverId }),
+  disconnectMcpServer: (serverId: string) =>
+    invoke<void>("disconnect_mcp_server", { serverId }),
+
+  onChatRetrieval: (handler: (r: ChatRetrieval) => void): Promise<UnlistenFn> =>
+    listen<ChatRetrieval>("chat://retrieval", (e) => handler(e.payload)),
+
   onChatDelta: (handler: (d: ChatDelta) => void): Promise<UnlistenFn> =>
     listen<ChatDelta>("chat://delta", (e) => handler(e.payload)),
 
@@ -128,4 +163,6 @@ const tauriIpc = {
 
 type Ipc = typeof tauriIpc;
 
-export const ipc: Ipc = IN_TAURI ? tauriIpc : (harnessIpc as Ipc);
+// The harness implements a superset (extra internal fields); cast through
+// unknown since the two object literals only need to agree on the Ipc surface.
+export const ipc: Ipc = IN_TAURI ? tauriIpc : (harnessIpc as unknown as Ipc);

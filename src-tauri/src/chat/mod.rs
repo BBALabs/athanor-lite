@@ -13,7 +13,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Instant;
 
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 
 use crate::error::{AthanorError, Result};
 use crate::metrics;
@@ -50,6 +50,9 @@ pub struct ChatMessage {
     pub ts: String,
     #[serde(default)]
     pub stats: Option<GenStats>,
+    /// Documents/chunks retrieved for this turn — retrieval visibility.
+    #[serde(default)]
+    pub sources: Vec<crate::rag::Source>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -85,6 +88,16 @@ pub struct Delta {
     pub workspace_id: String,
     pub conversation_id: String,
     pub delta: String,
+}
+
+/// Emitted the moment retrieval runs, before generation — so the UI can show
+/// "consulting the knowledge base" and which documents were pulled.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Retrieval {
+    pub workspace_id: String,
+    pub conversation_id: String,
+    pub sources: Vec<crate::rag::Source>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -246,9 +259,10 @@ pub fn send(
     conv.model_sha = Some(model_sha.clone());
     conv.messages.push(ChatMessage {
         role: "user".into(),
-        content: message,
+        content: message.clone(),
         ts: now.clone(),
         stats: None,
+        sources: Vec::new(),
     });
     conv.updated_at = now;
     save(app, &conv)?;
@@ -320,6 +334,60 @@ fn generate(app: &AppHandle, llm: &Llm, conv: &mut Conversation, cancel: &Atomic
             "content": format!("You are a focused assistant for this workspace. Its purpose: {purpose}")
         }));
     }
+
+    // Make the model aware of connected MCP tools (autonomous invocation is a
+    // later milestone; today the user drives tool calls from the UI).
+    let tools = crate::mcp::available_tools(&app.state::<crate::mcp::McpManager>(), &conv.workspace_id);
+    if !tools.is_empty() {
+        let list = tools
+            .iter()
+            .map(|(_, t)| {
+                format!("- {}: {}", t.name, t.description.as_deref().unwrap_or("(no description)"))
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+        api_messages.push(serde_json::json!({
+            "role": "system",
+            "content": format!("Tools available in this workspace via connected servers:\n{list}")
+        }));
+    }
+
+    // Retrieval: embed the latest user turn, pull relevant chunks, inject as
+    // context, and surface the sources to the UI immediately (before tokens).
+    let query = conv
+        .messages
+        .iter()
+        .rev()
+        .find(|m| m.role == "user")
+        .map(|m| m.content.clone())
+        .unwrap_or_default();
+    let sources = {
+        let embedder = app.state::<crate::rag::embed::Embedder>();
+        match crate::rag::retrieve(app, &embedder, &conv.workspace_id, &query) {
+            Ok((block, sources)) => {
+                if !block.is_empty() {
+                    api_messages.push(serde_json::json!({ "role": "system", "content": block }));
+                }
+                if !sources.is_empty() {
+                    let _ = app.emit(
+                        "chat://retrieval",
+                        &Retrieval {
+                            workspace_id: conv.workspace_id.clone(),
+                            conversation_id: conv.id.clone(),
+                            sources: sources.clone(),
+                        },
+                    );
+                }
+                sources
+            }
+            Err(e) => {
+                // Retrieval failure must never block chatting.
+                log::warn!(target: "rag", "retrieval skipped: {e}");
+                Vec::new()
+            }
+        }
+    };
+
     for m in &conv.messages {
         api_messages.push(serde_json::json!({ "role": m.role, "content": m.content }));
     }
@@ -407,6 +475,7 @@ fn generate(app: &AppHandle, llm: &Llm, conv: &mut Conversation, cancel: &Atomic
         content: content.clone(),
         ts: now.clone(),
         stats: stats.clone(),
+        sources,
     });
     conv.updated_at = now;
     save(app, conv)?;

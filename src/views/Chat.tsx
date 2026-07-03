@@ -9,7 +9,52 @@ import { useStore } from "../state/store";
 import { Markdown } from "../components/Markdown";
 import { PlusIcon, TrashIcon } from "../components/Icons";
 import { bytesHuman, monogram, relativeTime } from "../lib/format";
-import type { ChatMessage, LibraryModel } from "../lib/types";
+import { KnowledgeIcon } from "../components/Icons";
+import type { ChatMessage, LibraryModel, Source } from "../lib/types";
+
+/** Retrieved sources shown under a reply — transparency for what was pulled. */
+function Sources({ sources }: { sources: Source[] }) {
+  const [open, setOpen] = useState(false);
+  if (sources.length === 0) return null;
+  return (
+    <div className="sources">
+      <button className="sources__toggle t-quiet" onClick={() => setOpen((o) => !o)}>
+        <KnowledgeIcon size={13} />
+        drew on {sources.length} source{sources.length === 1 ? "" : "s"}
+        <span className="sources__names">
+          {" · "}
+          {[...new Set(sources.map((s) => s.docName))].join(", ")}
+        </span>
+      </button>
+      {open && (
+        <div className="sources__list">
+          {sources.map((s, i) => (
+            <div key={i} className="source">
+              <div className="source__head t-quiet">
+                <span className="source__doc">{s.docName}</span>
+                <span className="source__meta t-mono">
+                  #{s.chunkIndex} · {(s.score * 100).toFixed(0)}% match
+                </span>
+              </div>
+              <p className="source__excerpt">{s.excerpt}…</p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** "Consulting the knowledge base" while retrieval runs, before tokens. */
+function RetrievalStrip({ sources }: { sources: Source[] }) {
+  if (sources.length === 0) return null;
+  return (
+    <div className="retrieval-strip t-quiet">
+      <KnowledgeIcon size={13} />
+      consulting {[...new Set(sources.map((s) => s.docName))].join(", ")}
+    </div>
+  );
+}
 
 function EngineStrip() {
   const runtimeState = useStore((s) => s.runtimeState);
@@ -103,6 +148,7 @@ export function Chat() {
   const activeConv = useStore((s) => s.activeConv);
   const streamText = useStore((s) => s.streamText);
   const generating = useStore((s) => s.generating);
+  const liveSources = useStore((s) => s.liveSources);
   const library = useStore((s) => s.library);
   const sendMessage = useStore((s) => s.sendMessage);
   const stopGeneration = useStore((s) => s.stopGeneration);
@@ -233,11 +279,13 @@ export function Chat() {
                 {activeConv?.messages.map((m, i) => (
                   <div key={i} className={`msg msg--${m.role}`}>
                     {m.role === "assistant" ? <Markdown text={m.content} /> : m.content}
+                    {m.role === "assistant" && m.sources?.length > 0 && <Sources sources={m.sources} />}
                     {m.role === "assistant" && <StatsLine msg={m} />}
                   </div>
                 ))}
                 {generating && (
                   <div className="msg msg--assistant">
+                    <RetrievalStrip sources={liveSources} />
                     {streamText ? <Markdown text={streamText} /> : null}
                     <span className="caret" aria-hidden="true" />
                   </div>

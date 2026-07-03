@@ -24,6 +24,12 @@ pub enum AthanorError {
     #[error("chat error: {0}")]
     Chat(String),
 
+    #[error("knowledge base error: {0}")]
+    Rag(String),
+
+    #[error("MCP error: {0}")]
+    Mcp(String),
+
     #[error("filesystem error: {0}")]
     Io(#[from] std::io::Error),
 
@@ -43,6 +49,8 @@ impl AthanorError {
             AthanorError::Download(_) => "DOWNLOAD",
             AthanorError::Runtime(_) => "RUNTIME",
             AthanorError::Chat(_) => "CHAT",
+            AthanorError::Rag(_) => "RAG",
+            AthanorError::Mcp(_) => "MCP",
             AthanorError::Io(_) => "IO",
             AthanorError::Serde(_) => "SERDE",
             AthanorError::Path(_) => "PATH",

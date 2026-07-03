@@ -184,6 +184,34 @@ const harnessConvs: Conversation[] = [];
 let onChatDeltaHandler: ((d: ChatDelta) => void) | null = null;
 let onChatDoneHandler: ((d: ChatDone) => void) | null = null;
 let onOpsHandler: ((ops: Operation[]) => void) | null = null;
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+const harnessDocs: any[] = [
+  {
+    schema: 1,
+    id: "doc-meridian",
+    name: "meridian-notes.pdf",
+    sourcePath: "X:/docs/meridian-notes.pdf",
+    bytes: 842000,
+    chunkCount: 23,
+    status: "ready",
+    error: null,
+    addedAt: new Date(Date.now() - 3600000 * 5).toISOString(),
+  },
+  {
+    schema: 1,
+    id: "doc-spec",
+    name: "reactor-spec.docx",
+    sourcePath: "X:/docs/reactor-spec.docx",
+    bytes: 264000,
+    chunkCount: 11,
+    status: "ready",
+    error: null,
+    addedAt: new Date(Date.now() - 86400000).toISOString(),
+  },
+];
+const harnessMcp: any[] = [];
+/* eslint-enable @typescript-eslint/no-explicit-any */
 const harnessLiveOps: Record<string, Operation> = {};
 
 function harnessOps(): Operation[] {
@@ -327,7 +355,7 @@ export const harnessIpc = {
       };
       harnessConvs.unshift(conv);
     }
-    conv.messages.push({ role: "user", content: message, ts: new Date().toISOString(), stats: null });
+    conv.messages.push({ role: "user", content: message, ts: new Date().toISOString(), stats: null, sources: [] });
     const reply =
       "This is the **design harness** — a canned reply so the room can be styled.\n\n```rust\nfn ignition() {\n    println!(\"the machine speaks\");\n}\n```\nEverything here would stream token by token from llama.cpp in the desktop app.";
     const words = reply.split(/(?<=\s)/);
@@ -347,7 +375,7 @@ export const harnessIpc = {
       gpuActive: true,
       cancelled: false,
     };
-    conv.messages.push({ role: "assistant", content: acc, ts: new Date().toISOString(), stats });
+    conv.messages.push({ role: "assistant", content: acc, ts: new Date().toISOString(), stats, sources: [] });
     conv.updatedAt = new Date().toISOString();
     onChatDoneHandler?.({ workspaceId, conversationId: id, content: acc, stats, error: null });
     return id;
@@ -386,6 +414,89 @@ export const harnessIpc = {
   },
   onRuntimeState: async (_handler: (s: unknown) => void) => () => {},
   onServerStatus: async (_handler: (s: unknown) => void) => () => {},
+
+  // ── Knowledge base (RAG) — canned so the Knowledge view is designable. ──
+  getKnowledgeBase: async () => ({
+    documents: harnessDocs,
+    retrievalEnabled: true,
+    chunkTotal: harnessDocs.filter((d) => d.status === "ready").reduce((a, d) => a + d.chunkCount, 0),
+  }),
+  addDocuments: async (_wsId: string, paths: string[]) => {
+    for (const p of paths) {
+      const name = p.split(/[\\/]/).pop() ?? "document";
+      const id = `doc-${Date.now()}-${Math.round(name.length)}`;
+      harnessDocs.unshift({
+        schema: 1,
+        id,
+        name,
+        sourcePath: p,
+        bytes: 480000,
+        chunkCount: 0,
+        status: "indexing",
+        error: null,
+        addedAt: new Date().toISOString(),
+      } as never);
+      window.setTimeout(() => {
+        const d = harnessDocs.find((x) => x.id === id);
+        if (d) {
+          d.status = "ready";
+          d.chunkCount = 14;
+        }
+      }, 1600);
+    }
+  },
+  cancelIndexing: async () => {},
+  removeDocument: async (_wsId: string, docId: string) => {
+    const i = harnessDocs.findIndex((d) => d.id === docId);
+    if (i >= 0) harnessDocs.splice(i, 1);
+    return {
+      documents: harnessDocs,
+      retrievalEnabled: true,
+      chunkTotal: harnessDocs.reduce((a, d) => a + d.chunkCount, 0),
+    };
+  },
+  setRetrievalEnabled: async (_wsId: string, enabled: boolean) => ({
+    documents: harnessDocs,
+    retrievalEnabled: enabled,
+    chunkTotal: harnessDocs.reduce((a, d) => a + d.chunkCount, 0),
+  }),
+  previewChunks: async (_wsId: string, _docId: string) => [
+    { docId: "d", docName: "notes.md", chunkIndex: 0, score: 1, excerpt: "This workspace's documents are chunked, embedded, and stored locally in LanceDB." },
+    { docId: "d", docName: "notes.md", chunkIndex: 1, score: 1, excerpt: "Retrieval pulls the most relevant chunks into the model's context automatically." },
+  ],
+  stopEmbedder: async () => {},
+
+  // ── MCP ──
+  listMcpServers: async () => harnessMcp,
+  saveMcpServer: async (_wsId: string, config: Record<string, unknown>) => {
+    harnessMcp.push({ config, connected: false, serverName: null, tools: [], error: null } as never);
+    return harnessMcp;
+  },
+  removeMcpServer: async (_wsId: string, serverId: string) => {
+    const i = harnessMcp.findIndex((s) => s.config.id === serverId);
+    if (i >= 0) harnessMcp.splice(i, 1);
+    return harnessMcp;
+  },
+  connectMcpServer: async (_wsId: string, serverId: string) => {
+    const s = harnessMcp.find((x) => x.config.id === serverId);
+    if (s) {
+      s.connected = true;
+      s.serverName = "everything";
+      s.tools = [
+        { name: "echo", title: null, description: "Echo a message" },
+        { name: "add", title: null, description: "Add two numbers" },
+      ];
+    }
+    return s ?? harnessMcp[0];
+  },
+  disconnectMcpServer: async (serverId: string) => {
+    const s = harnessMcp.find((x) => x.config.id === serverId);
+    if (s) {
+      s.connected = false;
+      s.tools = [];
+    }
+  },
+  onChatRetrieval: async (_handler: (r: unknown) => void) => () => {},
 
   listOperations: async () => harnessOps(),
   cancelOperation: async (id: string) => {
