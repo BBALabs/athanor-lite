@@ -122,7 +122,8 @@ The catalog is **curated, not scraped**: a reviewed list of GGUF models embedded
 
 **Recommendation algorithm** (pure function, unit-tested):
 
-1. Compute the memory budget: largest single GPU VRAM × 0.90 − 1.0 GB runtime reserve;
+1. Compute the memory budget: largest single GPU VRAM × 0.95 − 0.5 GB runtime reserve
+   (constants live in `models/recommend.rs` — this document defers to code);
    CPU-only machines get RAM × 0.5 and a "CPU inference" flag with tempered expectations.
 2. For every catalog entry, pick the best quant that fits the budget (prefer Q4_K_M+; refuse
    quants below Q3 as quality-misleading).

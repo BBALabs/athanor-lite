@@ -21,9 +21,13 @@ const FILTERS: { id: Filter; label: string }[] = [
 
 type Verdict = "fits" | "tight" | "no";
 
+/**
+ * Honest fit: "tight" lives INSIDE the budget (85–100%). Over budget is over
+ * budget — the app's core promise is that a verdict is never a euphemism.
+ */
 function fitVerdict(minMemGb: number, budgetGb: number): Verdict {
-  if (minMemGb <= budgetGb) return "fits";
-  if (minMemGb <= budgetGb * 1.15) return "tight";
+  if (minMemGb <= budgetGb * 0.85) return "fits";
+  if (minMemGb <= budgetGb) return "tight";
   return "no";
 }
 

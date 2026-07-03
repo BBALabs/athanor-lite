@@ -144,6 +144,7 @@ export interface RecommendationSet {
 }
 
 export interface Workspace {
+  schema: number;
   id: string;
   name: string;
   purpose: string;
@@ -152,11 +153,15 @@ export interface Workspace {
   createdAt: string;
   lastOpenedAt: string;
   modelRefs: string[];
+  /** Library model (sha256) this workspace chats with. */
+  activeModel: string | null;
 }
 
 export interface WorkspaceList {
   workspaces: Workspace[];
   activeId: string | null;
+  /** Workspace dirs whose manifests could not be read — surfaced, never hidden. */
+  damaged: string[];
 }
 
 export interface CondereError {

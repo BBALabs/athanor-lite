@@ -73,7 +73,26 @@ export function Dashboard() {
   const vramGb = useTweenedNumber((liveGpu?.vramUsedBytes ?? 0) / GIB, 900);
   const gpuUtil = useTweenedNumber(liveGpu?.utilizationPct ?? 0, 700);
 
-  if (!hw) return null;
+  if (!hw) {
+    // Degraded state: detection failed — the cabin stays open, honestly labeled.
+    return (
+      <div className="dash view">
+        <header className="view-head">
+          <h1 className="t-display">System</h1>
+        </header>
+        <section className="degraded">
+          <div className="t-title">Hardware detection unavailable</div>
+          <p className="t-quiet degraded__note">
+            The probe could not read this machine. Model browsing still works;
+            recommendations need a hardware profile. Details are in the log file.
+          </p>
+          <button className="btn-lit" onClick={() => void useStore.getState().retryHardware()}>
+            Retry detection
+          </button>
+        </section>
+      </div>
+    );
+  }
 
   const cls = COMPUTE_CLASS_LABEL[hw.computeClass] ?? COMPUTE_CLASS_LABEL.CpuOnly;
   const ringTotal = liveGpu

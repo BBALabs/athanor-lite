@@ -133,6 +133,7 @@ function recommendations(): RecommendationSet {
 
 let workspaces: Workspace[] = [
   {
+    schema: 1,
     id: "harness-1",
     name: "Game Dev Assistant",
     purpose: "Godot scripting, shader help, design docs",
@@ -141,8 +142,10 @@ let workspaces: Workspace[] = [
     createdAt: new Date(Date.now() - 86400000 * 12).toISOString(),
     lastOpenedAt: new Date(Date.now() - 3600000 * 2).toISOString(),
     modelRefs: [],
+    activeModel: null,
   },
   {
+    schema: 1,
     id: "harness-2",
     name: "Legal Doc Review",
     purpose: "contract analysis over the Meridian file set",
@@ -151,12 +154,13 @@ let workspaces: Workspace[] = [
     createdAt: new Date(Date.now() - 86400000 * 5).toISOString(),
     lastOpenedAt: new Date(Date.now() - 86400000).toISOString(),
     modelRefs: [],
+    activeModel: null,
   },
 ];
 let activeId: string | null = "harness-1";
 
 function list(): WorkspaceList {
-  return { workspaces: [...workspaces], activeId };
+  return { workspaces: [...workspaces], activeId, damaged: [] };
 }
 
 export const harnessIpc = {
@@ -173,6 +177,7 @@ export const harnessIpc = {
   }): Promise<Workspace> => {
     const now = new Date().toISOString();
     const ws: Workspace = {
+      schema: 1,
       id: `harness-${Date.now()}`,
       name: args.name.trim(),
       purpose: args.purpose.trim(),
@@ -181,6 +186,7 @@ export const harnessIpc = {
       createdAt: now,
       lastOpenedAt: now,
       modelRefs: [],
+      activeModel: null,
     };
     workspaces = [ws, ...workspaces];
     activeId = ws.id;
@@ -192,6 +198,13 @@ export const harnessIpc = {
     if (!ws) throw { code: "WORKSPACE", message: `workspace ${id} not found` };
     ws.lastOpenedAt = new Date().toISOString();
     activeId = id;
+    return ws;
+  },
+
+  setWorkspaceModel: async (id: string, sha256: string | null): Promise<Workspace> => {
+    const ws = workspaces.find((w) => w.id === id);
+    if (!ws) throw { code: "WORKSPACE", message: `workspace ${id} not found` };
+    ws.activeModel = sha256;
     return ws;
   },
 

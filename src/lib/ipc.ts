@@ -37,6 +37,9 @@ const tauriIpc = {
   activateWorkspace: (id: string) =>
     invoke<Workspace>("activate_workspace", { id }),
 
+  setWorkspaceModel: (id: string, sha256: string | null) =>
+    invoke<Workspace>("set_workspace_model", { id, sha256 }),
+
   deleteWorkspace: (id: string) =>
     invoke<WorkspaceList>("delete_workspace", { id }),
 

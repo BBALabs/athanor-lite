@@ -29,7 +29,7 @@ fn get_model_catalog() -> Result<Catalog> {
 
 #[tauri::command]
 fn list_workspaces(app: tauri::AppHandle, lock: tauri::State<'_, WsLock>) -> Result<WorkspaceList> {
-    let _guard = lock.0.lock().unwrap();
+    let _guard = lock.acquire();
     workspaces::list(&app)
 }
 
@@ -42,7 +42,7 @@ fn create_workspace(
     accent_hue: u16,
     glyph: String,
 ) -> Result<Workspace> {
-    let _guard = lock.0.lock().unwrap();
+    let _guard = lock.acquire();
     workspaces::create(&app, &name, &purpose, accent_hue, &glyph)
 }
 
@@ -52,8 +52,19 @@ fn activate_workspace(
     lock: tauri::State<'_, WsLock>,
     id: String,
 ) -> Result<Workspace> {
-    let _guard = lock.0.lock().unwrap();
+    let _guard = lock.acquire();
     workspaces::activate(&app, &id)
+}
+
+#[tauri::command]
+fn set_workspace_model(
+    app: tauri::AppHandle,
+    lock: tauri::State<'_, WsLock>,
+    id: String,
+    sha256: Option<String>,
+) -> Result<Workspace> {
+    let _guard = lock.acquire();
+    workspaces::set_active_model(&app, &id, sha256)
 }
 
 #[tauri::command]
@@ -62,16 +73,26 @@ fn delete_workspace(
     lock: tauri::State<'_, WsLock>,
     id: String,
 ) -> Result<WorkspaceList> {
-    let _guard = lock.0.lock().unwrap();
+    let _guard = lock.acquire();
     workspaces::delete(&app, &id)
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        // A second launch focuses the existing window instead of racing the
+        // first process on the same data files.
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            if let Some(win) = app.get_webview_window("main") {
+                let _ = win.set_focus();
+                let _ = win.unminimize();
+            }
+        }))
         .plugin(
             tauri_plugin_log::Builder::new()
                 .level(log::LevelFilter::Info)
+                .max_file_size(1_000_000)
+                .rotation_strategy(tauri_plugin_log::RotationStrategy::KeepAll)
                 .targets([
                     tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Stdout),
                     tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::LogDir {
@@ -83,10 +104,19 @@ pub fn run() {
         .manage(WsLock::default())
         .setup(|app| {
             let handle = app.handle().clone();
-            std::thread::Builder::new()
+            if let Err(e) = std::thread::Builder::new()
                 .name("hw-telemetry".into())
                 .spawn(move || hardware::telemetry::run(handle))
-                .expect("telemetry thread must spawn");
+            {
+                // Telemetry is a degradable subsystem, never a startup failure.
+                log::error!("telemetry sampler unavailable: {e}");
+            }
+
+            let handle = app.handle().clone();
+            std::thread::Builder::new()
+                .name("trash-purge".into())
+                .spawn(move || workspaces::purge_trash(&handle))
+                .ok();
 
             log::info!(
                 "Condere {} online (data root: {:?})",
@@ -102,6 +132,7 @@ pub fn run() {
             list_workspaces,
             create_workspace,
             activate_workspace,
+            set_workspace_model,
             delete_workspace
         ])
         .run(tauri::generate_context!())
