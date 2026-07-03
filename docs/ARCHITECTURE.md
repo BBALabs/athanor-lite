@@ -1,6 +1,6 @@
-# Condere — System Architecture
+# Athanor — System Architecture
 
-**Product:** Condere — local AI, assembled.
+**Product:** Athanor — local AI, assembled.
 **Owner:** Black Box Analytics (Tony Winslow)
 **Status:** M1 in progress (shell, hardware intelligence, recommendation engine, workspace core)
 **Last updated:** 2026-07-03
@@ -9,7 +9,7 @@
 
 ## 1. Product thesis
 
-Condere makes running local AI models dead simple for any skill level. The differentiator is
+Athanor makes running local AI models dead simple for any skill level. The differentiator is
 **purpose-built workspaces**: a user creates an AI stack tuned for a specific job (game-dev
 assistant, legal doc reviewer, code helper), each with its own models, RAG corpus, memory
 graph, and fine-tunes — and switches between them like switching projects in an IDE.
@@ -19,7 +19,7 @@ Everything the app does flows from three promises:
 1. **It knows your machine.** Hardware is assessed on launch and every recommendation,
    download, and runtime decision is derived from that profile. The user is never allowed
    to walk into an out-of-memory wall.
-2. **It never breaks your system.** All runtimes, models, and indexes live inside Condere's
+2. **It never breaks your system.** All runtimes, models, and indexes live inside Athanor's
    own sandboxed directory tree. No global Python, no CUDA installs, no PATH edits, no
    conflicts with Docker or existing tooling.
 3. **It shows you what's happening.** Every long-running operation streams progress; every
@@ -41,7 +41,7 @@ Everything the app does flows from three promises:
 | Styling | Hand-built design system (pure CSS custom properties) | Brand requirement: no generic component libraries |
 
 There is intentionally **no bundled Python**. Inference, embedding, and (later) fine-tuning
-run through native sidecar binaries that Condere downloads, verifies, and version-pins itself.
+run through native sidecar binaries that Athanor downloads, verifies, and version-pins itself.
 
 ---
 
@@ -49,7 +49,7 @@ run through native sidecar binaries that Condere downloads, verifies, and versio
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│ Condere (Tauri core process — Rust)                             │
+│ Athanor (Tauri core process — Rust)                             │
 │                                                                 │
 │  ┌───────────────┐  ┌────────────────┐  ┌───────────────────┐  │
 │  │ Hardware      │  │ Model Manager  │  │ Workspace Manager │  │
@@ -83,7 +83,7 @@ Commands are typed end-to-end: Rust `serde` structs ↔ TypeScript interfaces in
 | `download://progress` (M2) | event ← | per-file byte progress, verify state |
 | `runtime://state` (M2) | event ← | sidecar lifecycle transitions |
 
-All commands return `Result<T, CondereError>`; errors carry a stable `code` the UI maps to
+All commands return `Result<T, AthanorError>`; errors carry a stable `code` the UI maps to
 designed failure states (never raw strings in the UI).
 
 ---
@@ -138,9 +138,9 @@ The catalog is **curated, not scraped**: a reviewed list of GGUF models embedded
 A workspace is a directory — fully self-contained, portable, deletable:
 
 ```
-%APPDATA%/com.bba.condere/
+%APPDATA%/com.bba.athanor/
 ├── state.json                  # active workspace id, app-level prefs
-├── logs/condere.log            # rotating structured log
+├── logs/athanor.log            # rotating structured log
 ├── models/                     # shared, content-addressed GGUF store (M2)
 │   └── <sha256>/<file>.gguf    # workspaces reference models; never copy them
 └── workspaces/

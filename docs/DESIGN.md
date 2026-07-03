@@ -1,7 +1,7 @@
-# Condere Design Language — "Black Glass" (v2)
+# Athanor Design Language — "Black Glass" (v2)
 
 **Binding spec for all UI work. Supersedes v1 entirely.**
-Thesis: Condere is a cockpit, not a dashboard — one sheet of black glass on which warm
+Thesis: Athanor is a cockpit, not a dashboard — one sheet of black glass on which warm
 light surfaces where the machine is alive. One dominant instrument per view. Light does
 the layout; lines never do. The room feels like a parked S-Class breathing on at night.
 

@@ -14,7 +14,7 @@ use workspaces::{Workspace, WorkspaceList, WsLock};
 async fn detect_hardware() -> Result<HardwareReport> {
     tauri::async_runtime::spawn_blocking(hardware::detect)
         .await
-        .map_err(|e| error::CondereError::Hardware(format!("probe task failed: {e}")))?
+        .map_err(|e| error::AthanorError::Hardware(format!("probe task failed: {e}")))?
 }
 
 #[tauri::command]
@@ -96,7 +96,7 @@ pub fn run() {
                 .targets([
                     tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Stdout),
                     tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::LogDir {
-                        file_name: Some("condere".into()),
+                        file_name: Some("athanor".into()),
                     }),
                 ])
                 .build(),
@@ -119,7 +119,7 @@ pub fn run() {
                 .ok();
 
             log::info!(
-                "Condere {} online (data root: {:?})",
+                "Athanor {} online (data root: {:?})",
                 env!("CARGO_PKG_VERSION"),
                 app.path().app_data_dir().ok()
             );

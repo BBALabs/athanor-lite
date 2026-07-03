@@ -164,17 +164,17 @@ export interface WorkspaceList {
   damaged: string[];
 }
 
-export interface CondereError {
+export interface AthanorError {
   code: string;
   message: string;
 }
 
-export function isCondereError(e: unknown): e is CondereError {
+export function isAthanorError(e: unknown): e is AthanorError {
   return (
     typeof e === "object" &&
     e !== null &&
     "code" in e &&
     "message" in e &&
-    typeof (e as CondereError).message === "string"
+    typeof (e as AthanorError).message === "string"
   );
 }

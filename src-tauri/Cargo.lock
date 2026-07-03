@@ -213,6 +213,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "athanor"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "log",
+ "nvml-wrapper",
+ "serde",
+ "serde_json",
+ "sysinfo",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-log",
+ "tauri-plugin-single-instance",
+ "thiserror 2.0.18",
+ "uuid",
+ "winreg",
+ "wmi",
+]
+
+[[package]]
 name = "atk"
 version = "0.18.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -594,26 +614,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4ca0197aee26d1ae37445ee532fefce43251d24cc7c166799f4d46817f1d3973"
 dependencies = [
  "crossbeam-utils",
-]
-
-[[package]]
-name = "condere"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "log",
- "nvml-wrapper",
- "serde",
- "serde_json",
- "sysinfo",
- "tauri",
- "tauri-build",
- "tauri-plugin-log",
- "tauri-plugin-single-instance",
- "thiserror 2.0.18",
- "uuid",
- "winreg",
- "wmi",
 ]
 
 [[package]]

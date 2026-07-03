@@ -25,7 +25,7 @@ const catalog = rawCatalog as Catalog;
 // The browser tab must never pass for the real app. (This module is imported
 // inside Tauri too — the retitle applies only to the browser harness.)
 if (!IN_TAURI && typeof document !== "undefined") {
-  document.title = "Condere — design harness (synthetic data)";
+  document.title = "Athanor — design harness (synthetic data)";
 }
 
 const GIB = 1024 ** 3;

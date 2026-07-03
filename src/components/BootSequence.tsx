@@ -48,7 +48,7 @@ export function BootSequence() {
       <div className="boot__sweep" />
       <div className="boot__center">
         <MarkIcon size={34} className="boot__mark" />
-        <div className="boot__wordmark">CONDERE</div>
+        <div className="boot__wordmark">ATHANOR</div>
 
         <div className="boot__progress">
           <div className="boot__progress-track" />

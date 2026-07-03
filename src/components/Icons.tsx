@@ -1,5 +1,5 @@
 /**
- * Condere icon set — drawn in-house on a 24px grid, 1.7px round strokes.
+ * Athanor icon set — drawn in-house on a 24px grid, 1.7px round strokes.
  * The keystone mark generates the drawing language; motifs are instrument-
  * grade, never stock (no bolts, no stacks, no pulses).
  */
@@ -22,7 +22,7 @@ function base({ size = 18, ...rest }: IconProps): SVGProps<SVGSVGElement> {
   };
 }
 
-/** Brand mark: a keystone — the block that locks the arch. condere: to found, to build. */
+/** Brand mark: a keystone — the block that locks the arch. athanor: to found, to build. */
 export function MarkIcon(props: IconProps) {
   return (
     <svg {...base(props)}>

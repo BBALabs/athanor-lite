@@ -1,8 +1,8 @@
-# Condere
+# Athanor
 
 **Local AI, assembled.** A Black Box Analytics product.
 
-Condere makes running local AI models dead simple for any skill level. Its core idea is
+Athanor makes running local AI models dead simple for any skill level. Its core idea is
 **purpose-built workspaces**: AI stacks tuned for a specific job — game-dev assistant,
 legal doc reviewer, code helper — each with its own models, RAG corpus, and memory,
 switched like projects in an IDE.

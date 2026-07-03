@@ -1,4 +1,4 @@
-//! Curated model catalog. Reviewed by hand, embedded in the binary — Condere
+//! Curated model catalog. Reviewed by hand, embedded in the binary — Athanor
 //! recommends models it can stand behind, not a scrape of the Hub.
 
 pub mod recommend;
@@ -7,7 +7,7 @@ use std::sync::OnceLock;
 
 use serde::{Deserialize, Serialize};
 
-use crate::error::{CondereError, Result};
+use crate::error::{AthanorError, Result};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -68,7 +68,7 @@ pub fn catalog() -> Result<&'static Catalog> {
             }
         })
         .as_ref()
-        .ok_or_else(|| CondereError::Catalog("embedded catalog failed to parse".into()))
+        .ok_or_else(|| AthanorError::Catalog("embedded catalog failed to parse".into()))
 }
 
 #[cfg(test)]

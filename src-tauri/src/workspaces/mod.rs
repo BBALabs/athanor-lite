@@ -14,7 +14,7 @@ use std::sync::Mutex;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager};
 
-use crate::error::{CondereError, Result};
+use crate::error::{AthanorError, Result};
 
 pub const SCHEMA_VERSION: u32 = 1;
 
@@ -97,7 +97,7 @@ pub fn write_atomic(path: &Path, contents: &[u8]) -> Result<()> {
     fs::rename(&tmp, path).map_err(|e| {
         // Never leave temp litter behind a failed rename.
         let _ = fs::remove_file(&tmp);
-        CondereError::Io(e)
+        AthanorError::Io(e)
     })
 }
 
@@ -115,7 +115,7 @@ pub fn data_root(app: &AppHandle) -> Result<PathBuf> {
     let root = app
         .path()
         .app_data_dir()
-        .map_err(|e| CondereError::Path(e.to_string()))?;
+        .map_err(|e| AthanorError::Path(e.to_string()))?;
     fs::create_dir_all(root.join("workspaces"))?;
     Ok(root)
 }
@@ -136,7 +136,7 @@ fn workspace_dir(app: &AppHandle, id: &str) -> Result<PathBuf> {
         || id.len() > 64
         || !id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-')
     {
-        return Err(CondereError::Workspace(format!("invalid workspace id: {id}")));
+        return Err(AthanorError::Workspace(format!("invalid workspace id: {id}")));
     }
     Ok(data_root(app)?.join("workspaces").join(id))
 }
@@ -155,8 +155,8 @@ fn read_state(app: &AppHandle) -> AppState {
         return AppState::default();
     }
     match fs::read_to_string(&path)
-        .map_err(CondereError::from)
-        .and_then(|s| serde_json::from_str::<AppState>(&s).map_err(CondereError::from))
+        .map_err(AthanorError::from)
+        .and_then(|s| serde_json::from_str::<AppState>(&s).map_err(AthanorError::from))
     {
         Ok(state) => state,
         Err(e) => {
@@ -237,10 +237,10 @@ pub fn create(
 ) -> Result<Workspace> {
     let name = name.trim();
     if name.is_empty() {
-        return Err(CondereError::Workspace("workspace name cannot be empty".into()));
+        return Err(AthanorError::Workspace("workspace name cannot be empty".into()));
     }
     if name.len() > 64 {
-        return Err(CondereError::Workspace("workspace name is too long (max 64 chars)".into()));
+        return Err(AthanorError::Workspace("workspace name is too long (max 64 chars)".into()));
     }
 
     let now = chrono::Utc::now().to_rfc3339();
@@ -273,7 +273,7 @@ pub fn create(
 pub fn activate(app: &AppHandle, id: &str) -> Result<Workspace> {
     let dir = workspace_dir(app, id)?;
     let mut ws = read_manifest(&dir)
-        .map_err(|_| CondereError::Workspace(format!("workspace {id} not found")))?;
+        .map_err(|_| AthanorError::Workspace(format!("workspace {id} not found")))?;
 
     ws.last_opened_at = chrono::Utc::now().to_rfc3339();
     write_manifest(&dir, &ws)?;
@@ -289,7 +289,7 @@ pub fn activate(app: &AppHandle, id: &str) -> Result<Workspace> {
 pub fn set_active_model(app: &AppHandle, id: &str, sha256: Option<String>) -> Result<Workspace> {
     let dir = workspace_dir(app, id)?;
     let mut ws = read_manifest(&dir)
-        .map_err(|_| CondereError::Workspace(format!("workspace {id} not found")))?;
+        .map_err(|_| AthanorError::Workspace(format!("workspace {id} not found")))?;
     ws.active_model = sha256;
     write_manifest(&dir, &ws)?;
     Ok(ws)
@@ -300,7 +300,7 @@ pub fn set_active_model(app: &AppHandle, id: &str, sha256: Option<String>) -> Re
 pub fn delete(app: &AppHandle, id: &str) -> Result<WorkspaceList> {
     let dir = workspace_dir(app, id)?;
     if !dir.exists() {
-        return Err(CondereError::Workspace(format!("workspace {id} not found")));
+        return Err(AthanorError::Workspace(format!("workspace {id} not found")));
     }
     let dest = trash_dir(app)?.join(format!("{id}-{}", chrono::Utc::now().timestamp()));
     fs::rename(&dir, &dest)?;
@@ -339,7 +339,7 @@ mod tests {
 
     #[test]
     fn atomic_write_replaces_existing() {
-        let dir = std::env::temp_dir().join(format!("condere-test-{}", uuid::Uuid::new_v4()));
+        let dir = std::env::temp_dir().join(format!("athanor-test-{}", uuid::Uuid::new_v4()));
         fs::create_dir_all(&dir).unwrap();
         let p = dir.join("f.json");
         write_atomic(&p, b"first").unwrap();

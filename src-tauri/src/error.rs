@@ -5,7 +5,7 @@ use thiserror::Error;
 /// Serialized as `{ code, message }` so the frontend can map every failure to a
 /// designed error state instead of showing raw strings.
 #[derive(Debug, Error)]
-pub enum CondereError {
+pub enum AthanorError {
     #[error("hardware probe failed: {0}")]
     Hardware(String),
 
@@ -25,30 +25,30 @@ pub enum CondereError {
     Path(String),
 }
 
-impl CondereError {
+impl AthanorError {
     pub fn code(&self) -> &'static str {
         match self {
-            CondereError::Hardware(_) => "HARDWARE",
-            CondereError::Workspace(_) => "WORKSPACE",
-            CondereError::Catalog(_) => "CATALOG",
-            CondereError::Io(_) => "IO",
-            CondereError::Serde(_) => "SERDE",
-            CondereError::Path(_) => "PATH",
+            AthanorError::Hardware(_) => "HARDWARE",
+            AthanorError::Workspace(_) => "WORKSPACE",
+            AthanorError::Catalog(_) => "CATALOG",
+            AthanorError::Io(_) => "IO",
+            AthanorError::Serde(_) => "SERDE",
+            AthanorError::Path(_) => "PATH",
         }
     }
 }
 
-impl serde::Serialize for CondereError {
+impl serde::Serialize for AthanorError {
     fn serialize<S: serde::Serializer>(
         &self,
         serializer: S,
     ) -> std::result::Result<S::Ok, S::Error> {
         use serde::ser::SerializeStruct;
-        let mut st = serializer.serialize_struct("CondereError", 2)?;
+        let mut st = serializer.serialize_struct("AthanorError", 2)?;
         st.serialize_field("code", self.code())?;
         st.serialize_field("message", &self.to_string())?;
         st.end()
     }
 }
 
-pub type Result<T> = std::result::Result<T, CondereError>;
+pub type Result<T> = std::result::Result<T, AthanorError>;

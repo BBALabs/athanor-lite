@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { ipc } from "../lib/ipc";
 import {
-  isCondereError,
+  isAthanorError,
   type Catalog,
   type HardwareReport,
   type RecommendationSet,
@@ -22,7 +22,7 @@ export interface BootStep {
 
 const TELEMETRY_WINDOW = 120; // samples ≈ 2 minutes at 1 Hz
 
-interface CondereStore {
+interface AthanorStore {
   boot: BootPhase;
   bootSteps: BootStep[];
   bootError: string | null;
@@ -53,14 +53,14 @@ interface CondereStore {
 }
 
 function errText(e: unknown): string {
-  if (isCondereError(e)) return `${e.code}: ${e.message}`;
+  if (isAthanorError(e)) return `${e.code}: ${e.message}`;
   return e instanceof Error ? e.message : String(e);
 }
 
 let telemetryBound = false;
 let initStarted = false; // React StrictMode double-fires effects in dev; boot once.
 
-export const useStore = create<CondereStore>((set, get) => ({
+export const useStore = create<AthanorStore>((set, get) => ({
   boot: "booting",
   bootSteps: [
     { label: "shell online", state: "done" },

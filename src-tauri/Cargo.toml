@@ -1,7 +1,7 @@
 [package]
-name = "condere"
+name = "athanor"
 version = "0.1.0"
-description = "Condere — local AI, assembled. Purpose-built AI workspaces on your own hardware."
+description = "Athanor — local AI, assembled. Purpose-built AI workspaces on your own hardware."
 authors = ["Tony Winslow <tonywinslow@bbasecure.com>"]
 edition = "2021"
 
@@ -9,7 +9,7 @@ edition = "2021"
 # The `_lib` suffix may seem redundant but it is necessary
 # to make the lib name unique and wouldn't conflict with the bin name.
 # This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
-name = "condere_lib"
+name = "athanor_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
