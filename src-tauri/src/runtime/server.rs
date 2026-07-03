@@ -1,6 +1,11 @@
 //! llama-server process lifecycle: one server at a time, serving the active
 //! workspace's model. Spawn → health-poll (503 while loading, 200 ready) →
 //! serve → drain/kill on model switch or app exit.
+//!
+//! Process-control guarantees: bring-up is serialized (no double-spawn),
+//! every child joins the app's job object (no orphans, even on hard kill),
+//! and the running engine is a visible, stoppable row in the operations
+//! registry at all times.
 
 use std::io::BufRead;
 use std::net::TcpListener;
@@ -10,12 +15,13 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use serde::Serialize;
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 
 use crate::error::{AthanorError, Result};
 use crate::hardware::{gpu, GIB};
+use crate::ops::{OpKind, Ops};
 
-use super::{ensure_runtime, pick_backend, Backend};
+use super::{ensure_runtime, guard, pick_backend, Backend};
 
 pub const EVENT_SERVER: &str = "runtime://server";
 
@@ -62,13 +68,21 @@ pub struct ActiveServer {
     pub api_key: String,
 }
 
-/// Managed state: the single active server (plus API exposure settings).
+/// Managed state: the single active server. `spawn` serializes engine
+/// bring-up so concurrent callers can never race two servers onto the GPU —
+/// the duplicate-process guarantee for inference.
 #[derive(Default)]
-pub struct Llm(pub Mutex<Option<ActiveServer>>);
+pub struct Llm {
+    active: Mutex<Option<ActiveServer>>,
+    spawn: Mutex<()>,
+}
 
 impl Llm {
     pub fn lock(&self) -> std::sync::MutexGuard<'_, Option<ActiveServer>> {
-        self.0.lock().unwrap_or_else(|p| p.into_inner())
+        self.active.lock().unwrap_or_else(|p| p.into_inner())
+    }
+    fn spawn_guard(&self) -> std::sync::MutexGuard<'_, ()> {
+        self.spawn.lock().unwrap_or_else(|p| p.into_inner())
     }
 }
 
@@ -114,24 +128,41 @@ pub fn stop(app: &AppHandle, llm: &Llm) {
         let _ = active.child.kill();
         let _ = active.child.wait();
     }
+    drop(guard);
+    if let Some(ops) = app.try_state::<Ops>() {
+        ops.done(app, "engine");
+    }
     emit_status(app, &ServerStatus::stopped());
 }
 
 /// Ensure a server is running for `model_sha`. Reuses a live server already
 /// holding that model; otherwise replaces the active server. Returns the port.
+/// Serialized: concurrent callers queue and re-check instead of double-spawning.
 pub fn ensure(app: &AppHandle, llm: &Llm, model_sha: &str) -> Result<u16> {
-    // Fast path: right model already live and process still healthy.
-    {
+    let already_live = |llm: &Llm| -> Option<u16> {
         let mut guard = llm.lock();
         if let Some(active) = guard.as_mut() {
             if active.model_sha == model_sha {
                 if let Ok(None) = active.child.try_wait() {
-                    return Ok(active.port);
+                    return Some(active.port);
                 }
                 log::warn!(target: "rt", "llama-server exited unexpectedly; restarting");
             }
         }
+        None
+    };
+
+    // Fast path without the spawn lock…
+    if let Some(port) = already_live(llm) {
+        return Ok(port);
     }
+    // …then serialize bring-up and re-check (a queued waiter usually finds
+    // the engine its predecessor just started).
+    let _spawning = llm.spawn_guard();
+    if let Some(port) = already_live(llm) {
+        return Ok(port);
+    }
+
     // Anything else live gets stopped first (one engine at a time).
     stop(app, llm);
 
@@ -142,6 +173,30 @@ pub fn ensure(app: &AppHandle, llm: &Llm, model_sha: &str) -> Result<u16> {
         .ok_or_else(|| AthanorError::Runtime("model not in library".into()))?
         .clone();
 
+    // The engine is a first-class, visible, stoppable operation.
+    let ops = app.state::<Ops>();
+    let _ = ops.begin(
+        app,
+        "engine",
+        OpKind::Engine,
+        &format!("Engine · {}", model.display_name),
+        true,
+        None,
+    );
+
+    let result = bring_up(app, llm, &model);
+    if let Err(e) = &result {
+        ops.failed(app, "engine", &e.to_string());
+        let mut status = ServerStatus::stopped();
+        status.phase = "error".into();
+        status.detail = e.to_string();
+        emit_status(app, &status);
+    }
+    result
+}
+
+fn bring_up(app: &AppHandle, llm: &Llm, model: &crate::downloads::LibraryModel) -> Result<u16> {
+    let ops = app.state::<Ops>();
     let backend = pick_backend();
     let mut status = ServerStatus {
         phase: "starting".into(),
@@ -154,6 +209,7 @@ pub fn ensure(app: &AppHandle, llm: &Llm, model_sha: &str) -> Result<u16> {
         detail: "preparing the engine".into(),
     };
     emit_status(app, &status);
+    ops.detail(app, "engine", "preparing the engine");
 
     let exe = ensure_runtime(app, backend)?;
 
@@ -199,6 +255,9 @@ pub fn ensure(app: &AppHandle, llm: &Llm, model_sha: &str) -> Result<u16> {
         .spawn()
         .map_err(|e| AthanorError::Runtime(format!("failed to start llama-server: {e}")))?;
 
+    // No orphans: the child dies with the app, even on a hard kill.
+    guard::adopt(&child);
+
     // Forward both output streams to the log — the engine's own report is the
     // only diagnosis channel a user can send us.
     let gpu_active = Arc::new(AtomicBool::new(false));
@@ -225,6 +284,7 @@ pub fn ensure(app: &AppHandle, llm: &Llm, model_sha: &str) -> Result<u16> {
     status.port = Some(port);
     status.detail = format!("loading {} into memory", model.display_name);
     emit_status(app, &status);
+    ops.detail(app, "engine", &status.detail);
 
     let client = reqwest::blocking::Client::builder()
         .timeout(Duration::from_secs(3))
@@ -242,6 +302,7 @@ pub fn ensure(app: &AppHandle, llm: &Llm, model_sha: &str) -> Result<u16> {
         }
         if started.elapsed() > budget {
             let _ = child.kill();
+            let _ = child.wait();
             return Err(AthanorError::Runtime(format!(
                 "model load timed out after {}s",
                 budget.as_secs()
@@ -277,6 +338,18 @@ pub fn ensure(app: &AppHandle, llm: &Llm, model_sha: &str) -> Result<u16> {
         "engine ready · CPU".into()
     };
     emit_status(app, &status);
+    ops.detail(app, "engine", "serving");
+    ops.resource(
+        app,
+        "engine",
+        &format!(
+            "{} · port {port} · {}",
+            vram_at_load
+                .map(|b| format!("{:.1} GB VRAM", b as f64 / GIB))
+                .unwrap_or_else(|| "no VRAM attributed".into()),
+            if status.gpu_active { "GPU" } else { "CPU" }
+        ),
+    );
     log::info!(
         target: "rt",
         "llama-server ready: {} on port {port} (gpu={}, vram_delta={:?})",

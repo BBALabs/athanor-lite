@@ -8,6 +8,7 @@ import {
   type DownloadProgress,
   type HardwareReport,
   type LibraryModel,
+  type Operation,
   type RecommendationSet,
   type RuntimeState,
   type ServerStatus,
@@ -58,9 +59,16 @@ interface AthanorStore {
   runtimeState: RuntimeState | null;
   serverStatus: ServerStatus | null;
   onboardingNeeded: boolean;
+  /** Everything running (or failed and awaiting attention), newest first. */
+  operations: Operation[];
+  opsOpen: boolean;
 
   setView: (v: View) => void;
   dismissOnboarding: () => void;
+  setOpsOpen: (open: boolean) => void;
+  cancelOperation: (id: string) => Promise<void>;
+  dismissOperation: (id: string) => Promise<void>;
+  retryOperation: (id: string) => Promise<void>;
   init: () => Promise<void>;
   retryHardware: () => Promise<void>;
   startDownload: (entryId: string, quant: string) => Promise<void>;
@@ -121,9 +129,36 @@ export const useStore = create<AthanorStore>((set, get) => ({
   runtimeState: null,
   serverStatus: null,
   onboardingNeeded: false,
+  operations: [],
+  opsOpen: false,
 
   setView: (view) => set({ view }),
   dismissOnboarding: () => set({ onboardingNeeded: false }),
+  setOpsOpen: (opsOpen) => set({ opsOpen }),
+
+  cancelOperation: async (id) => {
+    try {
+      await ipc.cancelOperation(id);
+    } catch (e) {
+      set({ lastOpError: errText(e) });
+    }
+  },
+
+  dismissOperation: async (id) => {
+    try {
+      await ipc.dismissOperation(id);
+    } catch (e) {
+      set({ lastOpError: errText(e) });
+    }
+  },
+
+  retryOperation: async (id) => {
+    try {
+      await ipc.retryOperation(id);
+    } catch (e) {
+      set({ lastOpError: errText(e) });
+    }
+  },
 
   init: async () => {
     if (initStarted) return;
@@ -236,6 +271,8 @@ export const useStore = create<AthanorStore>((set, get) => ({
       });
       await ipc.onRuntimeState((runtimeState) => set({ runtimeState }));
       await ipc.onServerStatus((serverStatus) => set({ serverStatus }));
+      await ipc.onOpsChanged((operations) => set({ operations }));
+      set({ operations: await ipc.listOperations() });
       const ws = get().workspaces;
       if (ws.activeId) await get().loadConversations();
     } catch (e) {

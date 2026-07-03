@@ -6,12 +6,10 @@
 //! Conversations are schema-versioned JSON files inside their workspace —
 //! portable and inspectable like everything else on disk.
 
-use std::collections::HashMap;
 use std::fs;
 use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
 use serde::{Deserialize, Serialize};
@@ -19,15 +17,16 @@ use tauri::{AppHandle, Emitter};
 
 use crate::error::{AthanorError, Result};
 use crate::metrics;
+use crate::ops::{OpKind, Ops};
 use crate::runtime::server::{self, Llm, CTX_SIZE};
 use crate::workspaces::{self, write_atomic};
 
 pub const EVENT_DELTA: &str = "chat://delta";
 pub const EVENT_DONE: &str = "chat://done";
 
-/// In-flight generation cancel flags, keyed by conversation id.
-#[derive(Default)]
-pub struct ChatCancels(pub Mutex<HashMap<String, Arc<AtomicBool>>>);
+pub fn op_id(conversation_id: &str) -> String {
+    format!("gen:{conversation_id}")
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -207,12 +206,12 @@ struct SseTimings {
 
 /// Run one generation turn. Blocking (call via spawn_blocking). Appends the
 /// user message durably before generating; streams deltas as events; appends
-/// the assistant message (with measured stats) when done.
-#[allow(clippy::too_many_arguments)]
+/// the assistant message (with measured stats) when done. Registered in the
+/// operations registry — one generation per conversation, cancellable there.
 pub fn send(
     app: &AppHandle,
     llm: &Llm,
-    cancels: &ChatCancels,
+    ops: &Ops,
     workspace_id: &str,
     conversation_id: Option<String>,
     message: String,
@@ -255,15 +254,22 @@ pub fn send(
     save(app, &conv)?;
     let conv_id = conv.id.clone();
 
-    let cancel = Arc::new(AtomicBool::new(false));
-    {
-        let mut map = cancels.0.lock().unwrap_or_else(|p| p.into_inner());
-        map.insert(conv_id.clone(), cancel.clone());
-    }
+    let cancel = ops
+        .begin(
+            app,
+            &op_id(&conv_id),
+            OpKind::Generation,
+            &format!("Generating · {}", conv.title),
+            true,
+            None,
+        )
+        .ok_or_else(|| AthanorError::Chat("a reply is already being generated here".into()))?;
+
     let result = generate(app, llm, &mut conv, &cancel);
-    {
-        let mut map = cancels.0.lock().unwrap_or_else(|p| p.into_inner());
-        map.remove(&conv_id);
+    match &result {
+        Ok(()) if cancel.load(Ordering::Relaxed) => ops.cancelled(app, &op_id(&conv_id)),
+        Ok(()) => ops.done(app, &op_id(&conv_id)),
+        Err(e) => ops.failed(app, &op_id(&conv_id), &e.to_string()),
     }
 
     match result {
@@ -422,9 +428,6 @@ fn generate(app: &AppHandle, llm: &Llm, conv: &mut Conversation, cancel: &Atomic
     Ok(())
 }
 
-pub fn cancel(cancels: &ChatCancels, conversation_id: &str) {
-    let map = cancels.0.lock().unwrap_or_else(|p| p.into_inner());
-    if let Some(flag) = map.get(conversation_id) {
-        flag.store(true, Ordering::Relaxed);
-    }
+pub fn cancel(ops: &Ops, conversation_id: &str) {
+    ops.request_cancel(&op_id(conversation_id));
 }

@@ -326,6 +326,24 @@ export interface ApiInfo {
   modelName: string | null;
 }
 
+export type OpKind = "download" | "engineFetch" | "engine" | "generation" | "import";
+export type OpState = "running" | "failed" | "cancelled";
+
+export interface Operation {
+  id: string;
+  kind: OpKind;
+  state: OpState;
+  label: string;
+  detail: string;
+  progressCurrent: number | null;
+  progressTotal: number | null;
+  resourceNote: string | null;
+  startedAt: string;
+  error: string | null;
+  cancellable: boolean;
+  retry: { kind: "download"; entryId: string; quant: string } | null;
+}
+
 export interface AthanorError {
   code: string;
   message: string;

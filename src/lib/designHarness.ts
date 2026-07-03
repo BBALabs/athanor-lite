@@ -17,6 +17,7 @@ import type {
   DownloadProgress,
   HardwareReport,
   LibraryModel,
+  Operation,
   Pick,
   RecommendationSet,
   Role,
@@ -175,6 +176,18 @@ let onProgress: ((p: DownloadProgress) => void) | null = null;
 const harnessConvs: Conversation[] = [];
 let onChatDeltaHandler: ((d: ChatDelta) => void) | null = null;
 let onChatDoneHandler: ((d: ChatDone) => void) | null = null;
+let onOpsHandler: ((ops: Operation[]) => void) | null = null;
+const harnessLiveOps: Record<string, Operation> = {};
+
+function harnessOps(): Operation[] {
+  return Object.values(harnessLiveOps);
+}
+
+function harnessOpUpdate(op: Operation | null, id: string) {
+  if (op) harnessLiveOps[id] = op;
+  else delete harnessLiveOps[id];
+  onOpsHandler?.(harnessOps());
+}
 
 function findQuant(entryId: string, quantLabel: string) {
   const entry = catalog.entries.find((e) => e.id === entryId);
@@ -195,7 +208,8 @@ export const harnessIpc = {
     const { entry, quant, file } = findQuant(entryId, quantLabel);
     if (harnessTimers[file.sha256] !== undefined) return;
     let received = 0;
-    const emit = (state: DownloadProgress["state"]) =>
+    const opId = `dl:${file.sha256}`;
+    const emit = (state: DownloadProgress["state"]) => {
       onProgress?.({
         sha256: file.sha256,
         entryId: entry.id,
@@ -207,6 +221,27 @@ export const harnessIpc = {
         state,
         error: null,
       });
+      const finished = state === "done" || state === "cancelled" || state === "failed";
+      harnessOpUpdate(
+        finished
+          ? null
+          : {
+              id: opId,
+              kind: "download",
+              state: "running",
+              label: `Download · ${file.name}`,
+              detail: "",
+              progressCurrent: received,
+              progressTotal: file.sizeBytes,
+              resourceNote: null,
+              startedAt: new Date().toISOString(),
+              error: null,
+              cancellable: true,
+              retry: { kind: "download", entryId: entry.id, quant: quant.label },
+            },
+        opId,
+      );
+    };
     emit("starting");
     harnessTimers[file.sha256] = window.setInterval(() => {
       received = Math.min(file.sizeBytes, received + file.sizeBytes * 0.04);
@@ -344,6 +379,19 @@ export const harnessIpc = {
   },
   onRuntimeState: async (_handler: (s: unknown) => void) => () => {},
   onServerStatus: async (_handler: (s: unknown) => void) => () => {},
+
+  listOperations: async () => harnessOps(),
+  cancelOperation: async (id: string) => {
+    if (id.startsWith("dl:")) await harnessIpc.cancelDownload(id.slice(3));
+  },
+  dismissOperation: async () => {},
+  retryOperation: async () => {},
+  onOpsChanged: async (handler: (ops: Operation[]) => void) => {
+    onOpsHandler = handler;
+    return () => {
+      onOpsHandler = null;
+    };
+  },
 
   getOllamaStatus: async () => ({ available: true, root: "X:/harness/.ollama", modelCount: 2 }),
   importOllama: async () => ({ found: 2, imported: 2, alreadyInLibrary: 0, skipped: [] }),

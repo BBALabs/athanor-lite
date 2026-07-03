@@ -13,6 +13,7 @@
 //! stderr for the CUDA backend-load line and report `gpu_active` honestly.
 
 pub mod api;
+pub mod guard;
 pub mod server;
 
 use std::fs;
@@ -20,10 +21,11 @@ use std::io::{Read, Write};
 use std::path::PathBuf;
 
 use serde::Serialize;
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 
 use crate::error::{AthanorError, Result};
 use crate::hardware::gpu;
+use crate::ops::{OpKind, Ops};
 use crate::workspaces;
 
 pub const EVENT_STATE: &str = "runtime://state";
@@ -116,13 +118,44 @@ pub fn runtime_dir(app: &AppHandle, backend: Backend) -> Result<PathBuf> {
 }
 
 /// Download + extract the runtime if missing. Blocking; call from a blocking
-/// task. Emits `runtime://state` throughout.
+/// task. Emits `runtime://state` throughout; registered in the operations
+/// registry as a cancellable fetch.
 pub fn ensure_runtime(app: &AppHandle, backend: Backend) -> Result<PathBuf> {
     let dir = runtime_dir(app, backend)?;
     let exe = dir.join("llama-server.exe");
     if exe.exists() {
         return Ok(exe);
     }
+
+    let ops = app.state::<Ops>();
+    let cancel = ops
+        .begin(
+            app,
+            "engine-fetch",
+            OpKind::EngineFetch,
+            &format!("Inference engine {LLAMA_TAG}"),
+            true,
+            None,
+        )
+        .ok_or_else(|| AthanorError::Runtime("engine fetch already running".into()))?;
+
+    let result = fetch_runtime(app, backend, &dir, &cancel);
+    match &result {
+        Ok(_) => ops.done(app, "engine-fetch"),
+        Err(e) if e.to_string().contains("cancelled") => ops.cancelled(app, "engine-fetch"),
+        Err(e) => ops.failed(app, "engine-fetch", &e.to_string()),
+    }
+    result
+}
+
+fn fetch_runtime(
+    app: &AppHandle,
+    backend: Backend,
+    dir: &std::path::Path,
+    cancel: &std::sync::atomic::AtomicBool,
+) -> Result<PathBuf> {
+    use std::sync::atomic::Ordering;
+    let ops = app.state::<Ops>();
 
     let assets: &[&RuntimeAsset] = match backend {
         Backend::Cuda12 => &[&CUDA12_BUILD, &CUDA12_RUNTIME],
@@ -174,6 +207,11 @@ pub fn ensure_runtime(app: &AppHandle, backend: Backend) -> Result<PathBuf> {
         let mut buf = vec![0u8; 1024 * 1024];
         let mut last = std::time::Instant::now();
         loop {
+            if cancel.load(Ordering::Relaxed) {
+                drop(file);
+                let _ = fs::remove_dir_all(&staging);
+                return Err(AthanorError::Runtime("cancelled".into()));
+            }
             let n = resp
                 .read(&mut buf)
                 .map_err(|e| AthanorError::Runtime(format!("engine download failed: {e}")))?;
@@ -185,6 +223,7 @@ pub fn ensure_runtime(app: &AppHandle, backend: Backend) -> Result<PathBuf> {
             if last.elapsed().as_millis() >= 300 {
                 state.received_bytes = done_bytes;
                 emit_state(app, &state);
+                ops.progress(app, "engine-fetch", done_bytes, total, "fetching the inference engine");
                 last = std::time::Instant::now();
             }
         }
@@ -193,6 +232,7 @@ pub fn ensure_runtime(app: &AppHandle, backend: Backend) -> Result<PathBuf> {
         state.phase = "extracting".into();
         state.detail = format!("unpacking {}", zip_path.file_name().unwrap_or_default().to_string_lossy());
         emit_state(app, &state);
+        ops.detail(app, "engine-fetch", &state.detail);
         let f = fs::File::open(&zip_path)?;
         let mut archive =
             zip::ZipArchive::new(f).map_err(|e| AthanorError::Runtime(format!("bad archive: {e}")))?;
@@ -212,9 +252,9 @@ pub fn ensure_runtime(app: &AppHandle, backend: Backend) -> Result<PathBuf> {
 
     // Atomic-ish install: staging -> final. A crash leaves staging, retried next time.
     if dir.exists() {
-        let _ = fs::remove_dir_all(&dir);
+        let _ = fs::remove_dir_all(dir);
     }
-    fs::rename(&staging, &dir)?;
+    fs::rename(&staging, dir)?;
 
     state.phase = "ready".into();
     state.received_bytes = total;

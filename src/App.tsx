@@ -4,6 +4,7 @@ import { Titlebar } from "./components/Titlebar";
 import { NavRail } from "./components/NavRail";
 import { BootSequence } from "./components/BootSequence";
 import { Onboarding } from "./components/Onboarding";
+import { OpsDrawer } from "./components/OpsDrawer";
 import { SettingsSheet } from "./components/SettingsSheet";
 import { Chat } from "./views/Chat";
 import { Dashboard } from "./views/Dashboard";
@@ -39,7 +40,13 @@ function StatusBar() {
   const sample = useLatestSample();
   const { workspaces, activeId } = useStore((s) => s.workspaces);
   const downloads = useStore((s) => s.downloads);
+  const operations = useStore((s) => s.operations);
+  const opsOpen = useStore((s) => s.opsOpen);
+  const setOpsOpen = useStore((s) => s.setOpsOpen);
   const active = workspaces.find((w) => w.id === activeId);
+
+  const running = operations.filter((o) => o.state === "running").length;
+  const failed = operations.filter((o) => o.state === "failed").length;
 
   // One live download owns the center of the status line while it runs.
   const liveDl = Object.values(downloads).find(
@@ -50,9 +57,17 @@ function StatusBar() {
     <footer className="statusbar">
       <div className="statusbar__cell">
         <span className={`statusbar__beat${sample ? " statusbar__beat--live" : ""}`} />
-        <span className="t-quiet tnum" title="Local monitor — nothing leaves this machine">
-          local monitor {sample ? "1 Hz" : "—"}
-        </span>
+        <button
+          className={`statusbar__ops t-quiet tnum${failed > 0 ? " statusbar__ops--failed" : ""}`}
+          onClick={() => setOpsOpen(!opsOpen)}
+          title="Operations — everything running, stoppable in one click"
+        >
+          {failed > 0
+            ? `${failed} needs attention`
+            : running > 0
+              ? `${running} operation${running === 1 ? "" : "s"} running`
+              : "no operations"}
+        </button>
       </div>
       <div className="statusbar__cell statusbar__cell--center">
         {liveDl ? (
@@ -128,6 +143,7 @@ export default function App() {
         </main>
       </div>
       <StatusBar />
+      <OpsDrawer />
       <OpErrorToast />
       {showSettings && <SettingsSheet onDone={() => setShowSettings(false)} />}
       {boot === "ready" && onboardingNeeded && <Onboarding onDone={dismissOnboarding} />}

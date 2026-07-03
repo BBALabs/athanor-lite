@@ -22,6 +22,7 @@ import type {
   MetricsRecord,
   MetricsSettings,
   OllamaStatus,
+  Operation,
   RecommendationSet,
   RuntimeState,
   ServerStatus,
@@ -92,6 +93,13 @@ const tauriIpc = {
   setMetricsShare: (share: boolean) => invoke<MetricsSettings>("set_metrics_share", { share }),
   getMetricsHistory: (limit: number) => invoke<MetricsRecord[]>("get_metrics_history", { limit }),
   getMetricsSample: () => invoke<unknown>("get_metrics_sample"),
+
+  listOperations: () => invoke<Operation[]>("list_operations"),
+  cancelOperation: (id: string) => invoke<void>("cancel_operation", { id }),
+  dismissOperation: (id: string) => invoke<void>("dismiss_operation", { id }),
+  retryOperation: (id: string) => invoke<void>("retry_operation", { id }),
+  onOpsChanged: (handler: (ops: Operation[]) => void): Promise<UnlistenFn> =>
+    listen<Operation[]>("ops://changed", (e) => handler(e.payload)),
 
   getOllamaStatus: () => invoke<OllamaStatus>("get_ollama_status"),
   importOllama: () => invoke<ImportReport>("import_ollama"),

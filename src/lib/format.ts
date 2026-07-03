@@ -5,14 +5,15 @@ export function gib(bytes: number, digits = 0): string {
   return (bytes / GIB).toFixed(digits);
 }
 
-/** Bytes -> human string with unit, GB-first because that's the mental model. */
+/** Bytes -> human string in DECIMAL units — matches the catalog's file sizes
+ *  (34.3 GB in the row must read 34.3 GB in the progress line). */
 export function bytesHuman(bytes: number): string {
-  if (bytes >= GIB) {
-    const v = bytes / GIB;
+  if (bytes >= 1e9) {
+    const v = bytes / 1e9;
     return `${v >= 100 ? v.toFixed(0) : v.toFixed(1)} GB`;
   }
-  if (bytes >= 1024 ** 2) return `${(bytes / 1024 ** 2).toFixed(0)} MB`;
-  return `${(bytes / 1024).toFixed(0)} KB`;
+  if (bytes >= 1e6) return `${(bytes / 1e6).toFixed(0)} MB`;
+  return `${(bytes / 1e3).toFixed(0)} KB`;
 }
 
 export function pct(value: number, digits = 0): string {

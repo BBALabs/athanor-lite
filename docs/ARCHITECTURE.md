@@ -179,6 +179,35 @@ src/
 - **Motion:** every state change acknowledges itself (staggered panel reveals, value
   tweening, pulse on event). Animations are transform/opacity only — no layout thrash.
 
+## 7b. Process control — a core design principle
+
+Every operation that outlives a click (download, engine fetch, model load,
+generation, import, and every future one: indexing, fine-tuning) obeys five
+rules, enforced by the **operations registry** (`ops/mod.rs`):
+
+1. **Visible:** it registers on start and appears in the Operations drawer
+   with progress, elapsed time, and resource notes. The status line always
+   shows the running count. No hidden work, ever.
+2. **Stoppable:** one click stops it, through one mechanism (the registry's
+   cancel flags; the engine stops by termination). Cancel is honored at the
+   next chunk/token boundary.
+3. **Duplicate-proof:** `Ops::begin` refuses a second running operation with
+   the same id — double-clicks, racing callers, and re-entrant flows all hit
+   the same guard. Engine bring-up is additionally serialized behind a spawn
+   lock (queued waiters re-check and reuse instead of double-spawning).
+4. **Recoverable:** failures stay visible with what/why and a retry spec
+   where one exists (downloads resume from their partial). Success leaves no
+   residue.
+5. **Orphan-free:** every child process is assigned to the app's Windows Job
+   Object (`KILL_ON_JOB_CLOSE`) — children die with the app even on a hard
+   kill (verified: `taskkill /F` leaves zero llama-server processes). A
+   startup sweep additionally terminates anything still executing from our
+   `runtimes/` directory after a crash of a pre-job-object build.
+
+Multi-step flows (onboarding today; RAG/fine-tune wizards later) must be
+skippable and back-out-able at every step, and any long step they trigger
+goes through the registry like everything else.
+
 ## 8. Reliability, security, logging
 
 - **Sandboxing:** Tauri capability system pinned to the minimum (window controls, events,

@@ -4,15 +4,16 @@ mod error;
 mod hardware;
 mod metrics;
 mod models;
+mod ops;
 mod runtime;
 mod workspaces;
 
-use chat::ChatCancels;
-use downloads::{Downloads, LibraryModel};
+use downloads::LibraryModel;
 use error::Result;
 use hardware::HardwareReport;
 use models::recommend::RecommendationSet;
 use models::Catalog;
+use ops::Ops;
 use runtime::server::Llm;
 use tauri::Manager;
 use workspaces::{Workspace, WorkspaceList, WsLock};
@@ -26,16 +27,55 @@ async fn chat_send(
 ) -> Result<String> {
     tauri::async_runtime::spawn_blocking(move || {
         let llm = app.state::<Llm>();
-        let cancels = app.state::<ChatCancels>();
-        chat::send(&app, &llm, &cancels, &workspace_id, conversation_id, message)
+        let ops = app.state::<Ops>();
+        chat::send(&app, &llm, &ops, &workspace_id, conversation_id, message)
     })
     .await
     .map_err(|e| error::AthanorError::Chat(format!("chat task failed: {e}")))?
 }
 
 #[tauri::command]
-fn cancel_generation(cancels: tauri::State<'_, ChatCancels>, conversation_id: String) {
-    chat::cancel(&cancels, &conversation_id);
+fn cancel_generation(ops: tauri::State<'_, Ops>, conversation_id: String) {
+    chat::cancel(&ops, &conversation_id);
+}
+
+// ── Operations registry surface ───────────────────────────────
+
+#[tauri::command]
+fn list_operations(ops: tauri::State<'_, Ops>) -> Vec<ops::Operation> {
+    ops.snapshot()
+}
+
+#[tauri::command]
+fn cancel_operation(
+    app: tauri::AppHandle,
+    ops: tauri::State<'_, Ops>,
+    llm: tauri::State<'_, Llm>,
+    id: String,
+) {
+    // The engine "cancels" by stopping (it isn't waiting on anything);
+    // everything else observes its cancel flag and winds down.
+    if ops.kind_of(&id) == Some(ops::OpKind::Engine) {
+        runtime::server::stop(&app, &llm);
+    } else {
+        ops.request_cancel(&id);
+    }
+}
+
+#[tauri::command]
+fn dismiss_operation(app: tauri::AppHandle, ops: tauri::State<'_, Ops>, id: String) {
+    ops.dismiss(&app, &id);
+}
+
+#[tauri::command]
+fn retry_operation(app: tauri::AppHandle, ops: tauri::State<'_, Ops>, id: String) -> Result<()> {
+    let Some(retry) = ops.get_retry(&id) else {
+        return Err(error::AthanorError::Chat("this operation has no retry".into()));
+    };
+    ops.dismiss(&app, &id);
+    match retry {
+        ops::RetrySpec::Download { entry_id, quant } => downloads::start(app, &entry_id, &quant),
+    }
 }
 
 #[tauri::command]
@@ -96,9 +136,20 @@ fn get_ollama_status() -> downloads::ollama::OllamaStatus {
 
 #[tauri::command]
 async fn import_ollama(app: tauri::AppHandle) -> Result<downloads::ollama::ImportReport> {
-    tauri::async_runtime::spawn_blocking(move || downloads::ollama::import(&app))
-        .await
-        .map_err(|e| error::AthanorError::Download(format!("import task failed: {e}")))?
+    tauri::async_runtime::spawn_blocking(move || {
+        let ops = app.state::<Ops>();
+        let _ = ops
+            .begin(&app, "import:ollama", ops::OpKind::Import, "Import from Ollama", false, None)
+            .ok_or_else(|| error::AthanorError::Download("import already running".into()))?;
+        let result = downloads::ollama::import(&app);
+        match &result {
+            Ok(_) => ops.done(&app, "import:ollama"),
+            Err(e) => ops.failed(&app, "import:ollama", &e.to_string()),
+        }
+        result
+    })
+    .await
+    .map_err(|e| error::AthanorError::Download(format!("import task failed: {e}")))?
 }
 
 #[tauri::command]
@@ -152,18 +203,13 @@ fn set_onboarded(app: tauri::AppHandle) -> Result<()> {
 }
 
 #[tauri::command]
-fn start_download(
-    app: tauri::AppHandle,
-    registry: tauri::State<'_, Downloads>,
-    entry_id: String,
-    quant: String,
-) -> Result<()> {
-    downloads::start(app, &registry, &entry_id, &quant)
+fn start_download(app: tauri::AppHandle, entry_id: String, quant: String) -> Result<()> {
+    downloads::start(app, &entry_id, &quant)
 }
 
 #[tauri::command]
-fn cancel_download(registry: tauri::State<'_, Downloads>, sha256: String) {
-    downloads::cancel(&registry, &sha256);
+fn cancel_download(ops: tauri::State<'_, Ops>, sha256: String) {
+    ops.request_cancel(&downloads::op_id(&sha256));
 }
 
 #[tauri::command]
@@ -258,11 +304,11 @@ fn selftest_chat(app: &tauri::AppHandle) -> Result<String> {
     workspaces::set_active_model(app, &ws.id, Some(model.sha256.clone()))?;
 
     let llm = app.state::<Llm>();
-    let cancels = app.state::<ChatCancels>();
+    let ops = app.state::<Ops>();
     let conv_id = chat::send(
         app,
         &llm,
-        &cancels,
+        &ops,
         &ws.id,
         None,
         "Reply with exactly the two words: IGNITION CONFIRMED".into(),
@@ -280,6 +326,21 @@ fn selftest_chat(app: &tauri::AppHandle) -> Result<String> {
         last.content.trim().chars().take(80).collect::<String>(),
         last.stats
     ))
+}
+
+/// Serve self-test: engine up, then hold forever (killed externally).
+#[cfg(debug_assertions)]
+fn selftest_serve(app: &tauri::AppHandle) -> Result<String> {
+    let model = downloads::ensure_installed(app, "llama-3.2-3b-instruct", "Q4_K_M")?;
+    let ws_list = workspaces::list(app)?;
+    let ws = match ws_list.workspaces.iter().find(|w| w.name == "Self Test") {
+        Some(w) => w.clone(),
+        None => workspaces::create(app, "Self Test", "pipeline verification", 275, "S")?,
+    };
+    workspaces::set_active_model(app, &ws.id, Some(model.sha256.clone()))?;
+    let llm = app.state::<Llm>();
+    let port = runtime::server::ensure(app, &llm, &model.sha256)?;
+    Ok(format!("engine on port {port}"))
 }
 
 /// Import self-test: scan the machine's real Ollama store, import in place,
@@ -334,9 +395,8 @@ pub fn run() {
                 .build(),
         )
         .manage(WsLock::default())
-        .manage(Downloads::default())
         .manage(Llm::default())
-        .manage(ChatCancels::default())
+        .manage(Ops::default())
         .setup(|app| {
             let handle = app.handle().clone();
             if let Err(e) = std::thread::Builder::new()
@@ -349,8 +409,16 @@ pub fn run() {
 
             let handle = app.handle().clone();
             std::thread::Builder::new()
-                .name("trash-purge".into())
-                .spawn(move || workspaces::purge_trash(&handle))
+                .name("housekeeping".into())
+                .spawn(move || {
+                    // Zero-orphan sweep first: kill any engine left over from
+                    // a previous session (pre-job-object builds or machine
+                    // crashes), then purge expired trash.
+                    if let Ok(root) = workspaces::data_root(&handle) {
+                        runtime::guard::sweep_orphans(&root.join("runtimes"));
+                    }
+                    workspaces::purge_trash(&handle);
+                })
                 .ok();
 
             // Headless full-pipeline self-test (dev builds only):
@@ -366,6 +434,20 @@ pub fn run() {
                         let result = match mode.as_str() {
                             "chat" => selftest_chat(&handle),
                             "import" => selftest_import(&handle),
+                            "serve" => {
+                                // Bring the engine up and HOLD — used by the
+                                // orphan-guard test (hard-kill the app, then
+                                // verify no llama-server survives).
+                                match selftest_serve(&handle) {
+                                    Ok(msg) => {
+                                        log::info!("SELFTEST SERVING: {msg}");
+                                        loop {
+                                            std::thread::sleep(std::time::Duration::from_secs(60));
+                                        }
+                                    }
+                                    Err(e) => Err(e),
+                                }
+                            }
                             other => Err(error::AthanorError::Chat(format!(
                                 "unknown selftest mode {other:?}"
                             ))),
@@ -421,7 +503,11 @@ pub fn run() {
             set_api_expose,
             start_engine,
             onboarding_needed,
-            set_onboarded
+            set_onboarded,
+            list_operations,
+            cancel_operation,
+            dismiss_operation,
+            retry_operation
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

@@ -15,12 +15,10 @@
 
 pub mod ollama;
 
-use std::collections::HashMap;
 use std::fs;
 use std::io::{Read, Write};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
@@ -29,15 +27,16 @@ use tauri::{AppHandle, Emitter, Manager};
 
 use crate::error::{AthanorError, Result};
 use crate::models::{catalog, QuantFile};
+use crate::ops::{OpKind, Ops, RetrySpec};
 use crate::workspaces::{self, write_atomic};
 
 pub const EVENT_PROGRESS: &str = "download://progress";
 const PROGRESS_INTERVAL: Duration = Duration::from_millis(250);
 const DISK_MARGIN_BYTES: u64 = 500 * 1024 * 1024;
 
-/// Active download registry: sha256 -> cancel flag.
-#[derive(Default)]
-pub struct Downloads(pub Mutex<HashMap<String, Arc<AtomicBool>>>);
+pub fn op_id(sha256: &str) -> String {
+    format!("dl:{sha256}")
+}
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -217,7 +216,7 @@ fn emit(app: &AppHandle, p: &DownloadProgress) {
 
 /// Begin (or resume) a download. Returns immediately; progress arrives as
 /// `download://progress` events keyed by sha256.
-pub fn start(app: AppHandle, registry: &Downloads, entry_id: &str, quant: &str) -> Result<()> {
+pub fn start(app: AppHandle, entry_id: &str, quant: &str) -> Result<()> {
     let spec = resolve_spec(entry_id, quant)?;
     let sha = spec.file.sha256.clone();
 
@@ -241,49 +240,56 @@ pub fn start(app: AppHandle, registry: &Downloads, entry_id: &str, quant: &str) 
         return Ok(());
     }
 
-    // Already downloading?
-    {
-        let mut jobs = registry.0.lock().unwrap_or_else(|p| p.into_inner());
-        if jobs.contains_key(&sha) {
-            return Err(AthanorError::Download("download already running".into()));
-        }
-        jobs.insert(sha.clone(), Arc::new(AtomicBool::new(false)));
-    }
-
-    let cancel = {
-        let jobs = registry.0.lock().unwrap_or_else(|p| p.into_inner());
-        jobs.get(&sha).cloned().expect("just inserted")
-    };
+    // Duplicate guard + cancel authority live in the operations registry.
+    let ops = app.state::<Ops>();
+    let cancel = ops
+        .begin(
+            &app,
+            &op_id(&sha),
+            OpKind::Download,
+            &format!("Download · {}", spec.file.name),
+            true,
+            Some(RetrySpec::Download {
+                entry_id: spec.entry_id.clone(),
+                quant: spec.quant.clone(),
+            }),
+        )
+        .ok_or_else(|| AthanorError::Download("download already running".into()))?;
 
     tauri::async_runtime::spawn_blocking(move || {
         let sha = spec.file.sha256.clone();
+        let id = op_id(&sha);
         let result = run_job(&app, &spec, &cancel);
-        // Deregister regardless of outcome.
-        if let Some(reg) = app.try_state::<Downloads>() {
-            let mut jobs = reg.0.lock().unwrap_or_else(|p| p.into_inner());
-            jobs.remove(&sha);
-        }
-        if let Err(e) = result {
-            log::warn!(target: "dl", "download {sha} ended: {e}");
-            let state = if matches!(e, AthanorError::Download(ref m) if m == "cancelled") {
-                DownloadState::Cancelled
-            } else {
-                DownloadState::Failed
-            };
-            emit(
-                &app,
-                &DownloadProgress {
-                    sha256: sha,
-                    entry_id: spec.entry_id.clone(),
-                    quant: spec.quant.clone(),
-                    file_name: spec.file.name.clone(),
-                    received_bytes: 0,
-                    total_bytes: spec.file.size_bytes,
-                    bytes_per_sec: 0,
-                    state,
-                    error: Some(e.to_string()),
-                },
-            );
+        let ops = app.state::<Ops>();
+        match &result {
+            Ok(()) => ops.done(&app, &id),
+            Err(e) => {
+                log::warn!(target: "dl", "download {sha} ended: {e}");
+                let cancelled = matches!(e, AthanorError::Download(ref m) if m == "cancelled");
+                if cancelled {
+                    ops.cancelled(&app, &id);
+                } else {
+                    ops.failed(&app, &id, &e.to_string());
+                }
+                emit(
+                    &app,
+                    &DownloadProgress {
+                        sha256: sha,
+                        entry_id: spec.entry_id.clone(),
+                        quant: spec.quant.clone(),
+                        file_name: spec.file.name.clone(),
+                        received_bytes: 0,
+                        total_bytes: spec.file.size_bytes,
+                        bytes_per_sec: 0,
+                        state: if cancelled {
+                            DownloadState::Cancelled
+                        } else {
+                            DownloadState::Failed
+                        },
+                        error: Some(e.to_string()),
+                    },
+                );
+            }
         }
     });
 
@@ -305,18 +311,17 @@ pub fn ensure_installed(app: &AppHandle, entry_id: &str, quant: &str) -> Result<
         .ok_or_else(|| AthanorError::Download("install did not register in the library".into()))
 }
 
-pub fn cancel(registry: &Downloads, sha256: &str) {
-    let jobs = registry.0.lock().unwrap_or_else(|p| p.into_inner());
-    if let Some(flag) = jobs.get(sha256) {
-        flag.store(true, Ordering::Relaxed);
-    }
-}
-
 fn run_job(app: &AppHandle, spec: &JobSpec, cancel: &AtomicBool) -> Result<()> {
     let part = partial_path(app, &spec.file.sha256)?;
     let dir = model_dir(app, &spec.file.sha256)?;
     let app2 = app.clone();
-    let final_path = run_job_core(&part, &dir, spec, cancel, move |p| emit(&app2, p))?;
+    let id = op_id(&spec.file.sha256);
+    let final_path = run_job_core(&part, &dir, spec, cancel, move |p| {
+        emit(&app2, p);
+        if let Some(ops) = app2.try_state::<Ops>() {
+            ops.progress(&app2, &id, p.received_bytes, p.total_bytes, "");
+        }
+    })?;
 
     let display_name = catalog()?
         .entries

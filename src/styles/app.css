@@ -1796,6 +1796,111 @@
   margin-top: var(--sp-2);
 }
 
+/* ── Operations drawer ─────────────────────────────────────── */
+
+.statusbar__ops {
+  color: var(--ink-low);
+  font-size: 10.5px;
+  padding: 3px 8px;
+  border-radius: var(--r-el);
+  transition: color var(--t-hover) var(--glide), background var(--t-hover) var(--glide);
+}
+
+.statusbar__ops:hover {
+  color: var(--ink-hi);
+  background: var(--srf-1);
+}
+
+.statusbar__ops--failed { color: var(--warn); }
+
+.ops-drawer {
+  position: fixed;
+  top: calc(var(--titlebar-h) + var(--sp-2));
+  right: var(--sp-2);
+  bottom: calc(var(--statusbar-h) + var(--sp-2));
+  width: 340px;
+  z-index: 55;
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--r-hero);
+  background: rgba(24, 17, 33, 0.92);
+  backdrop-filter: blur(20px) saturate(1.15);
+  box-shadow: var(--catchlight), var(--depth);
+  padding: var(--sp-3);
+  animation: drawerIn 420ms var(--glide) both;
+}
+
+@keyframes drawerIn {
+  from { opacity: 0; transform: translateX(24px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.ops-drawer__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: var(--sp-2);
+}
+
+.ops-drawer__empty {
+  line-height: 1.6;
+  padding-top: var(--sp-1);
+}
+
+.ops-drawer__list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.op {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: var(--sp-2);
+  border-radius: var(--r-srf);
+  background: var(--srf-1);
+  box-shadow: var(--catchlight);
+}
+
+.op--failed { box-shadow: var(--catchlight), inset 2px 0 0 var(--warn); }
+.op--cancelled { opacity: 0.65; }
+
+.op__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.op__label {
+  font-size: 13px;
+  color: var(--ink-hi);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.op__meta { font-size: 10.5px; }
+
+.op__error {
+  color: var(--warn);
+  line-height: 1.5;
+  user-select: text;
+}
+
+.op__actions {
+  display: flex;
+  gap: 6px;
+}
+
+.op__btn {
+  padding: 4px 10px;
+  font-size: 11px;
+}
+
 /* ── Toast ─────────────────────────────────────────────────── */
 
 .toast {
