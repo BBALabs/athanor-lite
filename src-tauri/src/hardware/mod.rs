@@ -45,6 +45,11 @@ pub struct GpuInfo {
     pub vram_used_bytes: Option<u64>,
     pub driver_version: Option<String>,
     pub cuda_version: Option<String>,
+    /// GPU generation ("Blackwell", "Ada Lovelace", …), derived from CUDA
+    /// compute capability so brand-new architectures identify correctly.
+    pub architecture: Option<String>,
+    /// CUDA compute capability, e.g. "12.0".
+    pub compute_capability: Option<String>,
     pub temperature_c: Option<u32>,
     pub utilization_pct: Option<u32>,
     /// Which probe produced this record: "nvml" (live-capable) or "wmi" (static).
@@ -208,5 +213,17 @@ mod tests {
         assert_eq!(classify(8.0), ComputeClass::VramMid);
         assert_eq!(classify(24.0), ComputeClass::VramHigh);
         assert_eq!(classify(48.0), ComputeClass::VramWorkstation);
+    }
+
+    /// Support diagnostic — prints the real detection result for THIS machine.
+    /// Run: cargo test probe_real_hardware -- --ignored --nocapture
+    #[test]
+    #[ignore]
+    fn probe_real_hardware() {
+        let report = detect().expect("detection must succeed");
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&report).expect("report serializes")
+        );
     }
 }

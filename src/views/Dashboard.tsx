@@ -105,7 +105,13 @@ export function Dashboard() {
           {primaryGpu && (
             <div className="cluster__id-drv t-quiet">
               {primaryGpu.source === "nvml"
-                ? `driver ${primaryGpu.driverVersion ?? "—"}${primaryGpu.cudaVersion ? ` · CUDA ${primaryGpu.cudaVersion}` : ""}`
+                ? [
+                    primaryGpu.architecture,
+                    primaryGpu.driverVersion ? `driver ${primaryGpu.driverVersion}` : null,
+                    primaryGpu.cudaVersion ? `CUDA ${primaryGpu.cudaVersion}` : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")
                 : "static probe — live GPU stats need an NVIDIA driver"}
             </div>
           )}

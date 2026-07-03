@@ -122,6 +122,18 @@
   color: var(--ink-mid);
 }
 
+/* Browser-harness marker — quiet, but impossible to mistake for real data. */
+.titlebar__harness {
+  margin-left: var(--sp-2);
+  padding: 3px 10px;
+  border-radius: var(--r-el);
+  background: rgba(231, 192, 136, 0.1);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--warn);
+}
+
 /* Window controls ghost until approached. */
 .titlebar__controls {
   display: flex;

@@ -32,6 +32,10 @@ export interface GpuInfo {
   vramUsedBytes: number | null;
   driverVersion: string | null;
   cudaVersion: string | null;
+  /** GPU generation ("Blackwell", "Ada Lovelace", …) from compute capability. */
+  architecture: string | null;
+  /** CUDA compute capability, e.g. "12.0". */
+  computeCapability: string | null;
   temperatureC: number | null;
   utilizationPct: number | null;
   source: "nvml" | "wmi" | string;

@@ -198,6 +198,8 @@ mod tests {
                     vram_used_bytes: None,
                     driver_version: None,
                     cuda_version: None,
+                    architecture: None,
+                    compute_capability: None,
                     temperature_c: None,
                     utilization_pct: None,
                     source: "test".into(),

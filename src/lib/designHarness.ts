@@ -8,6 +8,7 @@
  */
 
 import rawCatalog from "../../src-tauri/src/models/catalog.json";
+import { IN_TAURI } from "./tauriEnv";
 import type {
   Catalog,
   HardwareReport,
@@ -20,6 +21,12 @@ import type {
 } from "./types";
 
 const catalog = rawCatalog as Catalog;
+
+// The browser tab must never pass for the real app. (This module is imported
+// inside Tauri too — the retitle applies only to the browser harness.)
+if (!IN_TAURI && typeof document !== "undefined") {
+  document.title = "Condere — design harness (synthetic data)";
+}
 
 const GIB = 1024 ** 3;
 
@@ -41,6 +48,8 @@ const HW: HardwareReport = {
       vramUsedBytes: 9.2 * GIB,
       driverVersion: "580.88",
       cudaVersion: "13.0",
+      architecture: "Ada Lovelace",
+      computeCapability: "8.9",
       temperatureC: 52,
       utilizationPct: 14,
       source: "nvml",

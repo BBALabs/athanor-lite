@@ -39,6 +39,11 @@ export function Titlebar() {
         <span className="titlebar__wordmark" data-tauri-drag-region>
           CONDERE
         </span>
+        {!IN_TAURI && (
+          <span className="titlebar__harness" title="Browser design harness — hardware, telemetry, and workspaces shown here are synthetic. Run the desktop app for real data.">
+            design harness · synthetic data
+          </span>
+        )}
       </div>
 
       <div className="titlebar__controls">
