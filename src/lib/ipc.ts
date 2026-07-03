@@ -9,6 +9,7 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { IN_TAURI } from "./tauriEnv";
 import { harnessIpc } from "./designHarness";
 import type {
+  ApiInfo,
   Catalog,
   ChatDelta,
   ChatDone,
@@ -16,9 +17,11 @@ import type {
   ConversationMeta,
   DownloadProgress,
   HardwareReport,
+  ImportReport,
   LibraryModel,
   MetricsRecord,
   MetricsSettings,
+  OllamaStatus,
   RecommendationSet,
   RuntimeState,
   ServerStatus,
@@ -89,6 +92,14 @@ const tauriIpc = {
   setMetricsShare: (share: boolean) => invoke<MetricsSettings>("set_metrics_share", { share }),
   getMetricsHistory: (limit: number) => invoke<MetricsRecord[]>("get_metrics_history", { limit }),
   getMetricsSample: () => invoke<unknown>("get_metrics_sample"),
+
+  getOllamaStatus: () => invoke<OllamaStatus>("get_ollama_status"),
+  importOllama: () => invoke<ImportReport>("import_ollama"),
+  getApiInfo: () => invoke<ApiInfo>("get_api_info"),
+  setApiExpose: (expose: boolean) => invoke<ApiInfo>("set_api_expose", { expose }),
+  startEngine: (workspaceId: string) => invoke<void>("start_engine", { workspaceId }),
+  onboardingNeeded: () => invoke<boolean>("onboarding_needed"),
+  setOnboarded: () => invoke<void>("set_onboarded"),
 
   onChatDelta: (handler: (d: ChatDelta) => void): Promise<UnlistenFn> =>
     listen<ChatDelta>("chat://delta", (e) => handler(e.payload)),

@@ -345,6 +345,26 @@ export const harnessIpc = {
   onRuntimeState: async (_handler: (s: unknown) => void) => () => {},
   onServerStatus: async (_handler: (s: unknown) => void) => () => {},
 
+  getOllamaStatus: async () => ({ available: true, root: "X:/harness/.ollama", modelCount: 2 }),
+  importOllama: async () => ({ found: 2, imported: 2, alreadyInLibrary: 0, skipped: [] }),
+  getApiInfo: async () => ({
+    expose: false,
+    running: false,
+    baseUrl: "http://127.0.0.1:11435/v1",
+    apiKey: "harness-key-0000",
+    modelName: null,
+  }),
+  setApiExpose: async (expose: boolean) => ({
+    expose,
+    running: false,
+    baseUrl: "http://127.0.0.1:11435/v1",
+    apiKey: "harness-key-0000",
+    modelName: null,
+  }),
+  startEngine: async () => {},
+  onboardingNeeded: async () => false,
+  setOnboarded: async () => {},
+
   createWorkspace: async (args: {
     name: string;
     purpose: string;

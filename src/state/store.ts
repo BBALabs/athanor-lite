@@ -57,8 +57,10 @@ interface AthanorStore {
   generating: boolean;
   runtimeState: RuntimeState | null;
   serverStatus: ServerStatus | null;
+  onboardingNeeded: boolean;
 
   setView: (v: View) => void;
+  dismissOnboarding: () => void;
   init: () => Promise<void>;
   retryHardware: () => Promise<void>;
   startDownload: (entryId: string, quant: string) => Promise<void>;
@@ -118,8 +120,10 @@ export const useStore = create<AthanorStore>((set, get) => ({
   generating: false,
   runtimeState: null,
   serverStatus: null,
+  onboardingNeeded: false,
 
   setView: (view) => set({ view }),
+  dismissOnboarding: () => set({ onboardingNeeded: false }),
 
   init: async () => {
     if (initStarted) return;
@@ -236,6 +240,22 @@ export const useStore = create<AthanorStore>((set, get) => ({
       if (ws.activeId) await get().loadConversations();
     } catch (e) {
       console.error("chat streams unavailable", e);
+    }
+
+    try {
+      const needed = await ipc.onboardingNeeded();
+      const s = get();
+      // Only greet a genuinely fresh install — existing state means the user
+      // already knows the app.
+      set({
+        onboardingNeeded:
+          needed && s.workspaces.workspaces.length === 0 && s.library.length === 0,
+      });
+      if (!needed && s.workspaces.workspaces.length > 0) {
+        set({ view: "chat" });
+      }
+    } catch {
+      /* onboarding is optional sugar */
     }
 
     const { degraded } = get();

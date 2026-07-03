@@ -79,6 +79,21 @@ export function SpacesIcon(props: IconProps) {
   );
 }
 
+/** Settings: three calibration sliders. */
+export function SettingsIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M4 7h16M4 12h16M4 17h16" strokeOpacity={0.45} />
+      <circle cx="9" cy="7" r="2" fill="var(--field, #0a070e)" />
+      <circle cx="9" cy="7" r="2" />
+      <circle cx="15" cy="12" r="2" fill="var(--field, #0a070e)" />
+      <circle cx="15" cy="12" r="2" />
+      <circle cx="7" cy="17" r="2" fill="var(--field, #0a070e)" />
+      <circle cx="7" cy="17" r="2" />
+    </svg>
+  );
+}
+
 export function AlertIcon(props: IconProps) {
   return (
     <svg {...base(props)}>

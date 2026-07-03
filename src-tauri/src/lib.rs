@@ -90,6 +90,68 @@ fn get_metrics_sample(app: tauri::AppHandle) -> Result<serde_json::Value> {
 }
 
 #[tauri::command]
+fn get_ollama_status() -> downloads::ollama::OllamaStatus {
+    downloads::ollama::status()
+}
+
+#[tauri::command]
+async fn import_ollama(app: tauri::AppHandle) -> Result<downloads::ollama::ImportReport> {
+    tauri::async_runtime::spawn_blocking(move || downloads::ollama::import(&app))
+        .await
+        .map_err(|e| error::AthanorError::Download(format!("import task failed: {e}")))?
+}
+
+#[tauri::command]
+fn get_api_info(app: tauri::AppHandle, llm: tauri::State<'_, Llm>) -> Result<runtime::api::ApiInfo> {
+    runtime::api::info(&app, &llm)
+}
+
+#[tauri::command]
+fn set_api_expose(
+    app: tauri::AppHandle,
+    llm: tauri::State<'_, Llm>,
+    expose: bool,
+) -> Result<runtime::api::ApiInfo> {
+    runtime::api::set_expose(&app, expose)?;
+    // A running engine keeps its current binding; the new setting applies at
+    // the next engine start. Stop it so the next chat restarts on the stable
+    // port — least surprise for "expose it now".
+    runtime::server::stop(&app, &llm);
+    runtime::api::info(&app, &llm)
+}
+
+#[tauri::command]
+async fn start_engine(app: tauri::AppHandle, workspace_id: String) -> Result<()> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let ws_list = workspaces::list(&app)?;
+        let ws = ws_list
+            .workspaces
+            .iter()
+            .find(|w| w.id == workspace_id)
+            .ok_or_else(|| error::AthanorError::Workspace("workspace not found".into()))?;
+        let sha = ws
+            .active_model
+            .clone()
+            .ok_or_else(|| error::AthanorError::Chat("no model selected for this workspace".into()))?;
+        let llm = app.state::<Llm>();
+        runtime::server::ensure(&app, &llm, &sha).map(|_| ())
+    })
+    .await
+    .map_err(|e| error::AthanorError::Runtime(format!("engine task failed: {e}")))?
+}
+
+#[tauri::command]
+fn onboarding_needed(app: tauri::AppHandle) -> Result<bool> {
+    Ok(!workspaces::data_root(&app)?.join(".onboarded").exists())
+}
+
+#[tauri::command]
+fn set_onboarded(app: tauri::AppHandle) -> Result<()> {
+    std::fs::write(workspaces::data_root(&app)?.join(".onboarded"), b"1")?;
+    Ok(())
+}
+
+#[tauri::command]
 fn start_download(
     app: tauri::AppHandle,
     registry: tauri::State<'_, Downloads>,
@@ -220,6 +282,33 @@ fn selftest_chat(app: &tauri::AppHandle) -> Result<String> {
     ))
 }
 
+/// Import self-test: scan the machine's real Ollama store, import in place,
+/// verify the imported models appear in the library with valid paths.
+#[cfg(debug_assertions)]
+fn selftest_import(app: &tauri::AppHandle) -> Result<String> {
+    let status = downloads::ollama::status();
+    let report = downloads::ollama::import(app)?;
+    let library = downloads::list_library(app)?;
+    let ollama_models: Vec<_> = library.iter().filter(|m| m.source == "ollama").collect();
+    for m in &ollama_models {
+        if !std::path::Path::new(&m.path).exists() {
+            return Err(error::AthanorError::Download(format!(
+                "imported model has dangling path: {}",
+                m.path
+            )));
+        }
+    }
+    Ok(format!(
+        "ollama available={} found={} imported={} already={} skipped={:?} in_library={}",
+        status.available,
+        report.found,
+        report.imported,
+        report.already_in_library,
+        report.skipped,
+        ollama_models.len()
+    ))
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -268,13 +357,20 @@ pub fn run() {
             // ATHANOR_SELFTEST=chat -> install small model, start engine,
             // generate, log SELFTEST PASS/FAIL, exit.
             #[cfg(debug_assertions)]
-            if std::env::var("ATHANOR_SELFTEST").as_deref() == Ok("chat") {
+            if let Ok(mode) = std::env::var("ATHANOR_SELFTEST") {
                 let handle = app.handle().clone();
                 std::thread::Builder::new()
                     .name("selftest".into())
                     .spawn(move || {
                         std::thread::sleep(std::time::Duration::from_secs(2));
-                        let code = match selftest_chat(&handle) {
+                        let result = match mode.as_str() {
+                            "chat" => selftest_chat(&handle),
+                            "import" => selftest_import(&handle),
+                            other => Err(error::AthanorError::Chat(format!(
+                                "unknown selftest mode {other:?}"
+                            ))),
+                        };
+                        let code = match result {
                             Ok(summary) => {
                                 log::info!("SELFTEST PASS: {summary}");
                                 0
@@ -318,7 +414,14 @@ pub fn run() {
             get_metrics_settings,
             set_metrics_share,
             get_metrics_history,
-            get_metrics_sample
+            get_metrics_sample,
+            get_ollama_status,
+            import_ollama,
+            get_api_info,
+            set_api_expose,
+            start_engine,
+            onboarding_needed,
+            set_onboarded
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

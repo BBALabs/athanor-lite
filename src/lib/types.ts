@@ -305,6 +305,27 @@ export interface MetricsRecord {
   errorKind: string | null;
 }
 
+export interface OllamaStatus {
+  available: boolean;
+  root: string | null;
+  modelCount: number;
+}
+
+export interface ImportReport {
+  found: number;
+  imported: number;
+  alreadyInLibrary: number;
+  skipped: string[];
+}
+
+export interface ApiInfo {
+  expose: boolean;
+  running: boolean;
+  baseUrl: string;
+  apiKey: string;
+  modelName: string | null;
+}
+
 export interface AthanorError {
   code: string;
   message: string;

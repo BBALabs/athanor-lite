@@ -1,8 +1,10 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useStore, useLatestSample } from "./state/store";
 import { Titlebar } from "./components/Titlebar";
 import { NavRail } from "./components/NavRail";
 import { BootSequence } from "./components/BootSequence";
+import { Onboarding } from "./components/Onboarding";
+import { SettingsSheet } from "./components/SettingsSheet";
 import { Chat } from "./views/Chat";
 import { Dashboard } from "./views/Dashboard";
 import { Models } from "./views/Models";
@@ -104,12 +106,15 @@ function OpErrorToast() {
 export default function App() {
   const boot = useStore((s) => s.boot);
   const view = useStore((s) => s.view);
+  const onboardingNeeded = useStore((s) => s.onboardingNeeded);
+  const dismissOnboarding = useStore((s) => s.dismissOnboarding);
+  const [showSettings, setShowSettings] = useState(false);
 
   return (
     <div className="shell">
       <Titlebar />
       <div className="shell__body">
-        <NavRail />
+        <NavRail onSettings={() => setShowSettings(true)} />
         <Spine />
         <main className="shell__main" key={view}>
           {boot === "ready" && (
@@ -124,6 +129,8 @@ export default function App() {
       </div>
       <StatusBar />
       <OpErrorToast />
+      {showSettings && <SettingsSheet onDone={() => setShowSettings(false)} />}
+      {boot === "ready" && onboardingNeeded && <Onboarding onDone={dismissOnboarding} />}
       <BootSequence />
     </div>
   );

@@ -5,7 +5,7 @@
 
 import { useStore, type View } from "../state/store";
 import { monogram } from "../lib/format";
-import { ChatIcon, ModelsIcon, SpacesIcon, SystemIcon } from "./Icons";
+import { ChatIcon, ModelsIcon, SettingsIcon, SpacesIcon, SystemIcon } from "./Icons";
 
 const SECTIONS: { view: View; label: string; icon: typeof SystemIcon }[] = [
   { view: "chat", label: "Chat", icon: ChatIcon },
@@ -14,7 +14,7 @@ const SECTIONS: { view: View; label: string; icon: typeof SystemIcon }[] = [
   { view: "workspaces", label: "Workspaces", icon: SpacesIcon },
 ];
 
-export function NavRail() {
+export function NavRail({ onSettings }: { onSettings: () => void }) {
   const view = useStore((s) => s.view);
   const setView = useStore((s) => s.setView);
   const { workspaces, activeId } = useStore((s) => s.workspaces);
@@ -37,22 +37,32 @@ export function NavRail() {
         ))}
       </div>
 
-      {workspaces.length > 0 && (
-        <div className="rail__spaces">
-          {workspaces.slice(0, 5).map((ws) => (
-            <button
-              key={ws.id}
-              className={`rail__space${ws.id === activeId ? " rail__space--active" : ""}`}
-              style={{ ["--ws-hue" as string]: ws.accentHue }}
-              onClick={() => void activate(ws.id)}
-              title={ws.name}
-              aria-label={`Switch to workspace ${ws.name}`}
-            >
-              {monogram(ws.name)}
-            </button>
-          ))}
-        </div>
-      )}
+      <div className="rail__bottom">
+        {workspaces.length > 0 && (
+          <div className="rail__spaces">
+            {workspaces.slice(0, 5).map((ws) => (
+              <button
+                key={ws.id}
+                className={`rail__space${ws.id === activeId ? " rail__space--active" : ""}`}
+                style={{ ["--ws-hue" as string]: ws.accentHue }}
+                onClick={() => void activate(ws.id)}
+                title={ws.name}
+                aria-label={`Switch to workspace ${ws.name}`}
+              >
+                {monogram(ws.name)}
+              </button>
+            ))}
+          </div>
+        )}
+        <button
+          className="rail__item rail__settings"
+          onClick={onSettings}
+          title="Settings"
+          aria-label="Settings"
+        >
+          <SettingsIcon size={18} />
+        </button>
+      </div>
     </nav>
   );
 }

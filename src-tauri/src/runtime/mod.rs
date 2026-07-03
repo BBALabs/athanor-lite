@@ -12,6 +12,7 @@
 //! does not kill the process — it quietly runs on CPU. We watch the server's
 //! stderr for the CUDA backend-load line and report `gpu_active` honestly.
 
+pub mod api;
 pub mod server;
 
 use std::fs;
@@ -112,14 +113,6 @@ pub fn runtime_dir(app: &AppHandle, backend: Backend) -> Result<PathBuf> {
         Backend::Cpu => format!("{LLAMA_TAG}-cpu"),
     };
     Ok(workspaces::data_root(app)?.join("runtimes").join(name))
-}
-
-pub fn server_exe(app: &AppHandle, backend: Backend) -> Result<PathBuf> {
-    Ok(runtime_dir(app, backend)?.join("llama-server.exe"))
-}
-
-pub fn is_installed(app: &AppHandle, backend: Backend) -> bool {
-    server_exe(app, backend).map(|p| p.exists()).unwrap_or(false)
 }
 
 /// Download + extract the runtime if missing. Blocking; call from a blocking

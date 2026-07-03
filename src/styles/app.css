@@ -1572,6 +1572,230 @@
   line-height: 1.6;
 }
 
+/* ── Rail bottom (spaces + settings) ───────────────────────── */
+
+.rail__bottom {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.rail__settings {
+  height: 40px;
+  width: 40px;
+}
+
+/* ── Settings sheet ────────────────────────────────────────── */
+
+.sheet--settings {
+  max-height: 82vh;
+  overflow-y: auto;
+  gap: var(--sp-3);
+}
+
+.setting {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  padding-top: var(--sp-2);
+}
+
+.setting + .setting {
+  border-top: 1px solid rgba(244, 240, 234, 0.05);
+}
+
+.setting__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sp-3);
+}
+
+.setting__blurb {
+  margin-top: 4px;
+  line-height: 1.6;
+  max-width: 460px;
+}
+
+.setting__note { line-height: 1.6; }
+
+.setting__reveal {
+  align-self: flex-start;
+  padding: 4px 0;
+}
+
+.setting__payload {
+  max-height: 220px;
+  overflow: auto;
+  background: rgba(0, 0, 0, 0.35);
+  border-radius: var(--r-el);
+  padding: 12px 14px;
+  font-size: 10.5px;
+  line-height: 1.5;
+  user-select: text;
+}
+
+.setting__rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.setting__row {
+  display: grid;
+  grid-template-columns: 90px 1fr;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.copyable {
+  position: relative;
+  text-align: left;
+  padding: 7px 10px;
+  border-radius: var(--r-el);
+  background: rgba(0, 0, 0, 0.3);
+  color: var(--ink-mid);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: background var(--t-hover) var(--glide);
+}
+
+.copyable:hover { background: rgba(0, 0, 0, 0.45); }
+
+.copyable__hint {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 9.5px;
+  color: var(--lume-warm);
+  opacity: 0;
+  transition: opacity var(--t-hover) var(--glide);
+}
+
+.copyable:hover .copyable__hint { opacity: 1; }
+
+.sheet__actions--end { justify-content: flex-end; margin-top: var(--sp-1); }
+
+/* The switch — a track that fills with light. */
+.switch {
+  flex-shrink: 0;
+  width: 40px;
+  height: 22px;
+  border-radius: 11px;
+  background: rgba(244, 240, 234, 0.08);
+  position: relative;
+  transition: background var(--t-layout) var(--glide), box-shadow var(--t-layout) var(--glide);
+}
+
+.switch--on {
+  background: var(--lume-deep);
+  box-shadow: 0 0 12px rgba(160, 107, 255, 0.35), var(--catchlight);
+}
+
+.switch__dot {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--ink-mid);
+  transition: transform var(--t-layout) var(--glide), background var(--t-layout) var(--glide);
+}
+
+.switch--on .switch__dot {
+  transform: translateX(18px);
+  background: var(--lume-hot);
+}
+
+/* ── Onboarding ────────────────────────────────────────────── */
+
+.onboard {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(700px 420px at 50% 36%, rgba(107, 33, 168, 0.20), transparent 65%),
+    var(--field);
+  animation: veilIn 500ms var(--glide) both;
+}
+
+.onboard__center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  max-width: 560px;
+  padding: 0 var(--sp-3);
+  gap: var(--sp-2);
+}
+
+.onboard__title {
+  margin-top: var(--sp-2);
+  font-weight: 400;
+}
+
+.onboard__pct { color: var(--lume-warm); }
+
+.onboard__lead {
+  font-size: 13px;
+  line-height: 1.65;
+  max-width: 440px;
+}
+
+.onboard__error { color: var(--bad); }
+
+.onboard__actions {
+  margin-top: var(--sp-2);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.onboard__choices {
+  margin-top: var(--sp-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  width: 100%;
+}
+
+.onboard__choice {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: var(--sp-2) var(--sp-3);
+  text-align: left;
+  border-radius: var(--r-srf);
+  background: var(--srf-1);
+  box-shadow: var(--catchlight);
+  transition: background var(--t-hover) var(--glide), transform var(--t-hover) var(--glide),
+    box-shadow var(--t-layout) var(--glide);
+}
+
+.onboard__choice:hover {
+  background: var(--srf-2);
+  transform: translateY(-1px);
+}
+
+.onboard__choice--best {
+  box-shadow: var(--catchlight), var(--underglow);
+}
+
+.onboard__skip { margin-top: var(--sp-1); }
+
+.onboard__bar {
+  width: 100%;
+  max-width: 380px;
+  margin-top: var(--sp-2);
+}
+
 /* ── Toast ─────────────────────────────────────────────────── */
 
 .toast {

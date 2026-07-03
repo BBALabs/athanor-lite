@@ -57,7 +57,6 @@ pub struct ActiveServer {
     pub port: u16,
     pub model_sha: String,
     pub model_name: String,
-    pub backend: Backend,
     pub gpu_active: Arc<AtomicBool>,
     pub vram_at_load_bytes: Option<u64>,
     pub api_key: String,
@@ -157,8 +156,15 @@ pub fn ensure(app: &AppHandle, llm: &Llm, model_sha: &str) -> Result<u16> {
     emit_status(app, &status);
 
     let exe = ensure_runtime(app, backend)?;
-    let port = free_port()?;
-    let api_key = uuid::Uuid::new_v4().to_string();
+
+    // Exposed mode uses a stable port + persistent key so external tools
+    // survive engine restarts; private mode stays ephemeral.
+    let api = super::api::get_settings(app)?;
+    let (port, api_key) = if api.expose {
+        (api.port, api.api_key.clone())
+    } else {
+        (free_port()?, uuid::Uuid::new_v4().to_string())
+    };
 
     // Sampled immediately before spawn (runtime install is already done) so
     // the load-delta window is seconds, not minutes.
@@ -285,7 +291,6 @@ pub fn ensure(app: &AppHandle, llm: &Llm, model_sha: &str) -> Result<u16> {
         port,
         model_sha: model.sha256.clone(),
         model_name: model.display_name.clone(),
-        backend,
         gpu_active,
         vram_at_load_bytes: vram_at_load,
         api_key,

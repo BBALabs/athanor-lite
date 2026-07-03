@@ -13,6 +13,8 @@
 //! interrupted downloads resume from the partial (re-hashed on resume); a
 //! failed write can never corrupt an existing artifact (finalize is a rename).
 
+pub mod ollama;
+
 use std::collections::HashMap;
 use std::fs;
 use std::io::{Read, Write};
@@ -387,7 +389,7 @@ fn run_job_core(
     let mut hasher = Sha256::new();
     let mut received: u64 = 0;
     if part.exists() {
-        let mut existing = fs::File::open(&part)?;
+        let mut existing = fs::File::open(part)?;
         let mut buf = vec![0u8; 4 * 1024 * 1024];
         loop {
             let n = existing.read(&mut buf)?;
@@ -400,7 +402,7 @@ fn run_job_core(
         if received > total {
             // Corrupt partial (bigger than the artifact) — start over.
             drop(existing);
-            fs::remove_file(&part)?;
+            fs::remove_file(part)?;
             hasher = Sha256::new();
             received = 0;
         }
@@ -440,13 +442,13 @@ fn run_job_core(
     let mut resp_opt = None;
     if received == total && total > 0 {
         // Partial is already complete — straight to verification.
-        file = fs::OpenOptions::new().append(true).open(&part)?;
+        file = fs::OpenOptions::new().append(true).open(part)?;
     } else {
         let resp = req.send().map_err(|e| AthanorError::Download(e.to_string()))?;
         let status = resp.status();
         match status.as_u16() {
             206 => {
-                file = fs::OpenOptions::new().append(true).open(&part)?;
+                file = fs::OpenOptions::new().append(true).open(part)?;
             }
             200 => {
                 // Server ignored the range — start over.
@@ -454,7 +456,7 @@ fn run_job_core(
                     hasher = Sha256::new();
                     received = 0;
                 }
-                file = fs::File::create(&part)?;
+                file = fs::File::create(part)?;
             }
             416 => {
                 return Err(AthanorError::Download(
