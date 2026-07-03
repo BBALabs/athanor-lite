@@ -204,6 +204,107 @@ export interface WorkspaceList {
   damaged: string[];
 }
 
+export interface GenStats {
+  ttftMs: number;
+  promptN: number;
+  predictedN: number;
+  promptPerSecond: number;
+  predictedPerSecond: number;
+  contextUsed: number;
+  gpuActive: boolean;
+  cancelled: boolean;
+}
+
+export interface ChatMessage {
+  role: "user" | "assistant" | string;
+  content: string;
+  ts: string;
+  stats: GenStats | null;
+}
+
+export interface Conversation {
+  schema: number;
+  id: string;
+  workspaceId: string;
+  title: string;
+  modelSha: string | null;
+  createdAt: string;
+  updatedAt: string;
+  messages: ChatMessage[];
+}
+
+export interface ConversationMeta {
+  id: string;
+  title: string;
+  updatedAt: string;
+  messageCount: number;
+}
+
+export interface ChatDelta {
+  workspaceId: string;
+  conversationId: string;
+  delta: string;
+}
+
+export interface ChatDone {
+  workspaceId: string;
+  conversationId: string;
+  content: string;
+  stats: GenStats | null;
+  error: string | null;
+}
+
+export interface RuntimeState {
+  phase: "checking" | "downloading" | "extracting" | "ready" | "error" | string;
+  backend: "cuda12" | "cuda13" | "cpu";
+  tag: string;
+  receivedBytes: number;
+  totalBytes: number;
+  detail: string;
+}
+
+export interface ServerStatus {
+  phase: "starting" | "loading" | "ready" | "stopped" | "error" | string;
+  modelSha: string | null;
+  modelName: string | null;
+  port: number | null;
+  backend: "cuda12" | "cuda13" | "cpu" | null;
+  gpuActive: boolean;
+  vramAtLoadBytes: number | null;
+  detail: string;
+}
+
+export interface MetricsSettings {
+  schema: number;
+  share: boolean;
+}
+
+export interface MetricsRecord {
+  schema: number;
+  ts: string;
+  event: string;
+  hw: {
+    gpu: string | null;
+    vramGb: number | null;
+    driver: string | null;
+    cpu: string;
+    ramGb: number;
+    os: string;
+  };
+  llamaBuild: string;
+  appVersion: string;
+  modelSha: string;
+  ctx: number;
+  gpuActive: boolean;
+  ttftMs: number | null;
+  promptN: number | null;
+  promptPerSecond: number | null;
+  predictedN: number | null;
+  predictedPerSecond: number | null;
+  vramAtLoadBytes: number | null;
+  errorKind: string | null;
+}
+
 export interface AthanorError {
   code: string;
   message: string;

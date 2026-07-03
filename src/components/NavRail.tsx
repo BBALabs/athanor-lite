@@ -5,9 +5,10 @@
 
 import { useStore, type View } from "../state/store";
 import { monogram } from "../lib/format";
-import { ModelsIcon, SpacesIcon, SystemIcon } from "./Icons";
+import { ChatIcon, ModelsIcon, SpacesIcon, SystemIcon } from "./Icons";
 
 const SECTIONS: { view: View; label: string; icon: typeof SystemIcon }[] = [
+  { view: "chat", label: "Chat", icon: ChatIcon },
   { view: "dashboard", label: "System", icon: SystemIcon },
   { view: "models", label: "Models", icon: ModelsIcon },
   { view: "workspaces", label: "Workspaces", icon: SpacesIcon },

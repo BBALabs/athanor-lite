@@ -10,10 +10,18 @@ import { IN_TAURI } from "./tauriEnv";
 import { harnessIpc } from "./designHarness";
 import type {
   Catalog,
+  ChatDelta,
+  ChatDone,
+  Conversation,
+  ConversationMeta,
   DownloadProgress,
   HardwareReport,
   LibraryModel,
+  MetricsRecord,
+  MetricsSettings,
   RecommendationSet,
+  RuntimeState,
+  ServerStatus,
   TelemetrySample,
   Workspace,
   WorkspaceList,
@@ -59,6 +67,40 @@ const tauriIpc = {
 
   onDownloadProgress: (handler: (p: DownloadProgress) => void): Promise<UnlistenFn> =>
     listen<DownloadProgress>("download://progress", (e) => handler(e.payload)),
+
+  chatSend: (workspaceId: string, conversationId: string | null, message: string) =>
+    invoke<string>("chat_send", { workspaceId, conversationId, message }),
+
+  cancelGeneration: (conversationId: string) =>
+    invoke<void>("cancel_generation", { conversationId }),
+
+  listConversations: (workspaceId: string) =>
+    invoke<ConversationMeta[]>("list_conversations", { workspaceId }),
+
+  getConversation: (workspaceId: string, conversationId: string) =>
+    invoke<Conversation>("get_conversation", { workspaceId, conversationId }),
+
+  deleteConversation: (workspaceId: string, conversationId: string) =>
+    invoke<ConversationMeta[]>("delete_conversation", { workspaceId, conversationId }),
+
+  stopEngine: () => invoke<void>("stop_engine"),
+
+  getMetricsSettings: () => invoke<MetricsSettings>("get_metrics_settings"),
+  setMetricsShare: (share: boolean) => invoke<MetricsSettings>("set_metrics_share", { share }),
+  getMetricsHistory: (limit: number) => invoke<MetricsRecord[]>("get_metrics_history", { limit }),
+  getMetricsSample: () => invoke<unknown>("get_metrics_sample"),
+
+  onChatDelta: (handler: (d: ChatDelta) => void): Promise<UnlistenFn> =>
+    listen<ChatDelta>("chat://delta", (e) => handler(e.payload)),
+
+  onChatDone: (handler: (d: ChatDone) => void): Promise<UnlistenFn> =>
+    listen<ChatDone>("chat://done", (e) => handler(e.payload)),
+
+  onRuntimeState: (handler: (s: RuntimeState) => void): Promise<UnlistenFn> =>
+    listen<RuntimeState>("runtime://state", (e) => handler(e.payload)),
+
+  onServerStatus: (handler: (s: ServerStatus) => void): Promise<UnlistenFn> =>
+    listen<ServerStatus>("runtime://server", (e) => handler(e.payload)),
 };
 
 type Ipc = typeof tauriIpc;

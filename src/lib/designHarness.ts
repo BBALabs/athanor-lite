@@ -11,6 +11,9 @@ import rawCatalog from "../../src-tauri/src/models/catalog.json";
 import { IN_TAURI } from "./tauriEnv";
 import type {
   Catalog,
+  ChatDelta,
+  ChatDone,
+  Conversation,
   DownloadProgress,
   HardwareReport,
   LibraryModel,
@@ -169,6 +172,9 @@ function list(): WorkspaceList {
 let harnessLibrary: LibraryModel[] = [];
 const harnessTimers: Record<string, number> = {};
 let onProgress: ((p: DownloadProgress) => void) | null = null;
+const harnessConvs: Conversation[] = [];
+let onChatDeltaHandler: ((d: ChatDelta) => void) | null = null;
+let onChatDoneHandler: ((d: ChatDone) => void) | null = null;
 
 function findQuant(entryId: string, quantLabel: string) {
   const entry = catalog.entries.find((e) => e.id === entryId);
@@ -261,6 +267,83 @@ export const harnessIpc = {
       onProgress = null;
     };
   },
+
+  /* Chat — canned streaming so the room can be designed in a browser. */
+  chatSend: async (workspaceId: string, conversationId: string | null, message: string) => {
+    const id = conversationId ?? `conv-${Date.now()}`;
+    let conv = harnessConvs.find((c) => c.id === id);
+    if (!conv) {
+      conv = {
+        schema: 1,
+        id,
+        workspaceId,
+        title: message.slice(0, 48),
+        modelSha: null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        messages: [],
+      };
+      harnessConvs.unshift(conv);
+    }
+    conv.messages.push({ role: "user", content: message, ts: new Date().toISOString(), stats: null });
+    const reply =
+      "This is the **design harness** — a canned reply so the room can be styled.\n\n```rust\nfn ignition() {\n    println!(\"the machine speaks\");\n}\n```\nEverything here would stream token by token from llama.cpp in the desktop app.";
+    const words = reply.split(/(?<=\s)/);
+    let acc = "";
+    for (const w of words) {
+      await new Promise((r) => setTimeout(r, 26));
+      acc += w;
+      onChatDeltaHandler?.({ workspaceId, conversationId: id, delta: w });
+    }
+    const stats = {
+      ttftMs: 380,
+      promptN: 42,
+      predictedN: words.length,
+      promptPerSecond: 900,
+      predictedPerSecond: 38.4,
+      contextUsed: 42 + words.length,
+      gpuActive: true,
+      cancelled: false,
+    };
+    conv.messages.push({ role: "assistant", content: acc, ts: new Date().toISOString(), stats });
+    conv.updatedAt = new Date().toISOString();
+    onChatDoneHandler?.({ workspaceId, conversationId: id, content: acc, stats, error: null });
+    return id;
+  },
+  cancelGeneration: async () => {},
+  listConversations: async (workspaceId: string) =>
+    harnessConvs
+      .filter((c) => c.workspaceId === workspaceId)
+      .map((c) => ({ id: c.id, title: c.title, updatedAt: c.updatedAt, messageCount: c.messages.length })),
+  getConversation: async (_workspaceId: string, conversationId: string) => {
+    const c = harnessConvs.find((x) => x.id === conversationId);
+    if (!c) throw { code: "CHAT", message: "conversation not found" };
+    return JSON.parse(JSON.stringify(c)) as Conversation;
+  },
+  deleteConversation: async (workspaceId: string, conversationId: string) => {
+    const i = harnessConvs.findIndex((c) => c.id === conversationId);
+    if (i >= 0) harnessConvs.splice(i, 1);
+    return harnessIpc.listConversations(workspaceId);
+  },
+  stopEngine: async () => {},
+  getMetricsSettings: async () => ({ schema: 1, share: false }),
+  setMetricsShare: async (share: boolean) => ({ schema: 1, share }),
+  getMetricsHistory: async () => [],
+  getMetricsSample: async () => ({ note: "design harness — synthetic" }),
+  onChatDelta: async (handler: (d: ChatDelta) => void) => {
+    onChatDeltaHandler = handler;
+    return () => {
+      onChatDeltaHandler = null;
+    };
+  },
+  onChatDone: async (handler: (d: ChatDone) => void) => {
+    onChatDoneHandler = handler;
+    return () => {
+      onChatDoneHandler = null;
+    };
+  },
+  onRuntimeState: async (_handler: (s: unknown) => void) => () => {},
+  onServerStatus: async (_handler: (s: unknown) => void) => () => {},
 
   createWorkspace: async (args: {
     name: string;

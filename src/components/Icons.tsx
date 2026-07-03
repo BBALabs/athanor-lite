@@ -32,6 +32,17 @@ export function MarkIcon(props: IconProps) {
   );
 }
 
+/** Chat: a console line — the prompt caret and the machine's reply. */
+export function ChatIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M5 7.5 9 11l-4 3.5" />
+      <path d="M12 15h7" strokeOpacity={0.75} />
+      <path d="M4 20h16" strokeOpacity={0.35} />
+    </svg>
+  );
+}
+
 /** System: a calibrated dial — 270° sweep and a needle. */
 export function SystemIcon(props: IconProps) {
   return (

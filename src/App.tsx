@@ -3,6 +3,7 @@ import { useStore, useLatestSample } from "./state/store";
 import { Titlebar } from "./components/Titlebar";
 import { NavRail } from "./components/NavRail";
 import { BootSequence } from "./components/BootSequence";
+import { Chat } from "./views/Chat";
 import { Dashboard } from "./views/Dashboard";
 import { Models } from "./views/Models";
 import { Workspaces } from "./views/Workspaces";
@@ -113,6 +114,7 @@ export default function App() {
         <main className="shell__main" key={view}>
           {boot === "ready" && (
             <>
+              {view === "chat" && <Chat />}
               {view === "dashboard" && <Dashboard />}
               {view === "models" && <Models />}
               {view === "workspaces" && <Workspaces />}

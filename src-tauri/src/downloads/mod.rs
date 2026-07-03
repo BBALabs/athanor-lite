@@ -288,6 +288,21 @@ pub fn start(app: AppHandle, registry: &Downloads, entry_id: &str, quant: &str) 
     Ok(())
 }
 
+/// Blocking install-if-missing. Used by the dev self-test and the onboarding
+/// fast path; the evented `start` is the interactive route.
+pub fn ensure_installed(app: &AppHandle, entry_id: &str, quant: &str) -> Result<LibraryModel> {
+    let spec = resolve_spec(entry_id, quant)?;
+    let sha = spec.file.sha256.clone();
+    if let Some(m) = list_library(app)?.into_iter().find(|m| m.sha256 == sha) {
+        return Ok(m);
+    }
+    run_job(app, &spec, &AtomicBool::new(false))?;
+    list_library(app)?
+        .into_iter()
+        .find(|m| m.sha256 == sha)
+        .ok_or_else(|| AthanorError::Download("install did not register in the library".into()))
+}
+
 pub fn cancel(registry: &Downloads, sha256: &str) {
     let jobs = registry.0.lock().unwrap_or_else(|p| p.into_inner());
     if let Some(flag) = jobs.get(sha256) {

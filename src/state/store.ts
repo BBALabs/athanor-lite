@@ -3,16 +3,22 @@ import { ipc } from "../lib/ipc";
 import {
   isAthanorError,
   type Catalog,
+  type Conversation,
+  type ConversationMeta,
   type DownloadProgress,
   type HardwareReport,
   type LibraryModel,
   type RecommendationSet,
+  type RuntimeState,
+  type ServerStatus,
   type TelemetrySample,
   type Workspace,
   type WorkspaceList,
 } from "../lib/types";
 
-export type View = "dashboard" | "models" | "workspaces";
+export type View = "chat" | "dashboard" | "models" | "workspaces";
+
+const PENDING_CONV = "pending";
 export type BootPhase = "booting" | "ready" | "error";
 export type Subsystem = "hardware" | "catalog" | "recommendations" | "workspaces" | "telemetry";
 
@@ -43,12 +49,28 @@ interface AthanorStore {
   /** Non-fatal, user-visible operation failure (workspace ops etc.). */
   lastOpError: string | null;
 
+  // Chat
+  conversations: ConversationMeta[];
+  activeConv: Conversation | null;
+  /** Assistant text accumulating during a live generation. */
+  streamText: string | null;
+  generating: boolean;
+  runtimeState: RuntimeState | null;
+  serverStatus: ServerStatus | null;
+
   setView: (v: View) => void;
   init: () => Promise<void>;
   retryHardware: () => Promise<void>;
   startDownload: (entryId: string, quant: string) => Promise<void>;
   cancelDownload: (sha256: string) => Promise<void>;
   deleteModel: (sha256: string) => Promise<void>;
+  loadConversations: () => Promise<void>;
+  openConversation: (id: string) => Promise<void>;
+  newSession: () => void;
+  sendMessage: (text: string) => Promise<void>;
+  stopGeneration: () => Promise<void>;
+  removeConversation: (id: string) => Promise<void>;
+  chooseWorkspaceModel: (sha256: string | null) => Promise<void>;
   createWorkspace: (args: {
     name: string;
     purpose: string;
@@ -90,6 +112,12 @@ export const useStore = create<AthanorStore>((set, get) => ({
   library: [],
   downloads: {},
   lastOpError: null,
+  conversations: [],
+  activeConv: null,
+  streamText: null,
+  generating: false,
+  runtimeState: null,
+  serverStatus: null,
 
   setView: (view) => set({ view }),
 
@@ -185,6 +213,31 @@ export const useStore = create<AthanorStore>((set, get) => ({
       console.error("library unavailable", e);
     }
 
+    // Chat + engine event streams.
+    try {
+      await ipc.onChatDelta((d) => {
+        set((s) => {
+          if (!s.generating) return {};
+          let activeConv = s.activeConv;
+          // Adopt the real id for a conversation created by this send.
+          if (activeConv && activeConv.id === PENDING_CONV) {
+            activeConv = { ...activeConv, id: d.conversationId };
+          }
+          if (!activeConv || activeConv.id !== d.conversationId) return {};
+          return { activeConv, streamText: (s.streamText ?? "") + d.delta };
+        });
+      });
+      await ipc.onChatDone((d) => {
+        if (d.error) set({ lastOpError: d.error });
+      });
+      await ipc.onRuntimeState((runtimeState) => set({ runtimeState }));
+      await ipc.onServerStatus((serverStatus) => set({ serverStatus }));
+      const ws = get().workspaces;
+      if (ws.activeId) await get().loadConversations();
+    } catch (e) {
+      console.error("chat streams unavailable", e);
+    }
+
     const { degraded } = get();
     // Truly fatal only when nothing at all came up (e.g. the IPC bridge is gone).
     if (degraded.length >= 5) {
@@ -240,10 +293,118 @@ export const useStore = create<AthanorStore>((set, get) => ({
     }
   },
 
+  loadConversations: async () => {
+    const wsId = get().workspaces.activeId;
+    if (!wsId) {
+      set({ conversations: [], activeConv: null });
+      return;
+    }
+    try {
+      set({ conversations: await ipc.listConversations(wsId) });
+    } catch (e) {
+      console.error("conversations unavailable", e);
+      set({ conversations: [] });
+    }
+  },
+
+  openConversation: async (id) => {
+    const wsId = get().workspaces.activeId;
+    if (!wsId) return;
+    try {
+      set({ activeConv: await ipc.getConversation(wsId, id), streamText: null });
+    } catch (e) {
+      set({ lastOpError: errText(e) });
+    }
+  },
+
+  newSession: () => set({ activeConv: null, streamText: null }),
+
+  sendMessage: async (text) => {
+    const s = get();
+    const wsId = s.workspaces.activeId;
+    if (!wsId || s.generating || !text.trim()) return;
+
+    const now = new Date().toISOString();
+    const base: Conversation = s.activeConv ?? {
+      schema: 1,
+      id: PENDING_CONV,
+      workspaceId: wsId,
+      title: text.trim().slice(0, 48),
+      modelSha: null,
+      createdAt: now,
+      updatedAt: now,
+      messages: [],
+    };
+    const optimistic: Conversation = {
+      ...base,
+      messages: [...base.messages, { role: "user", content: text, ts: now, stats: null }],
+      updatedAt: now,
+    };
+    set({ activeConv: optimistic, generating: true, streamText: "" });
+
+    const convId = base.id === PENDING_CONV ? null : base.id;
+    try {
+      const realId = await ipc.chatSend(wsId, convId, text);
+      const [conv, conversations] = await Promise.all([
+        ipc.getConversation(wsId, realId),
+        ipc.listConversations(wsId),
+      ]);
+      set({ activeConv: conv, conversations, generating: false, streamText: null });
+    } catch (e) {
+      set({ generating: false, streamText: null, lastOpError: errText(e) });
+      // Reload from disk — the user turn was persisted before generation.
+      const active = get().activeConv;
+      if (active && active.id !== PENDING_CONV) {
+        try {
+          set({ activeConv: await ipc.getConversation(wsId, active.id) });
+        } catch {
+          /* keep optimistic state */
+        }
+      }
+    }
+  },
+
+  stopGeneration: async () => {
+    const conv = get().activeConv;
+    if (conv) {
+      try {
+        await ipc.cancelGeneration(conv.id);
+      } catch (e) {
+        set({ lastOpError: errText(e) });
+      }
+    }
+  },
+
+  removeConversation: async (id) => {
+    const wsId = get().workspaces.activeId;
+    if (!wsId) return;
+    try {
+      const conversations = await ipc.deleteConversation(wsId, id);
+      set((s) => ({
+        conversations,
+        activeConv: s.activeConv?.id === id ? null : s.activeConv,
+      }));
+    } catch (e) {
+      set({ lastOpError: errText(e) });
+    }
+  },
+
+  chooseWorkspaceModel: async (sha256) => {
+    const wsId = get().workspaces.activeId;
+    if (!wsId) return;
+    try {
+      await ipc.setWorkspaceModel(wsId, sha256);
+      set({ workspaces: await ipc.listWorkspaces() });
+    } catch (e) {
+      set({ lastOpError: errText(e) });
+    }
+  },
+
   createWorkspace: async (args) => {
     try {
       const ws = await ipc.createWorkspace(args);
       set({ workspaces: await ipc.listWorkspaces() });
+      await get().loadConversations();
       return ws;
     } catch (e) {
       set({ lastOpError: errText(e) });
@@ -254,10 +415,16 @@ export const useStore = create<AthanorStore>((set, get) => ({
   activateWorkspace: async (id) => {
     // Optimistic — switching must feel instant; reconcile after.
     const prior = get().workspaces;
-    set((s) => ({ workspaces: { ...s.workspaces, activeId: id } }));
+    set((s) => ({
+      workspaces: { ...s.workspaces, activeId: id },
+      activeConv: null,
+      streamText: null,
+      conversations: [],
+    }));
     try {
       await ipc.activateWorkspace(id);
       set({ workspaces: await ipc.listWorkspaces() });
+      await get().loadConversations();
     } catch (e) {
       // Double failure (reconcile also failed) must not escape or corrupt state.
       try {
