@@ -51,6 +51,8 @@ export function SettingsSheet({ onDone }: { onDone: () => void }) {
   const [ollama, setOllama] = useState<OllamaStatus | null>(null);
   const [importReport, setImportReport] = useState<ImportReport | null>(null);
   const [importing, setImporting] = useState(false);
+  const [updateBusy, setUpdateBusy] = useState(false);
+  const [updateNote, setUpdateNote] = useState<string | null>(null);
 
   useEffect(() => {
     void ipc.getMetricsSettings().then(setMetrics).catch(() => {});
@@ -178,6 +180,36 @@ export function SettingsSheet({ onDone }: { onDone: () => void }) {
                 : ""}
             </p>
           )}
+        </section>
+
+        {/* ── Updates ─────────────────────────────── */}
+        <section className="setting">
+          <div className="setting__head">
+            <div>
+              <div className="t-title">Updates</div>
+              <p className="t-quiet setting__blurb">
+                Athanor 0.1.0. Updates are cryptographically signed and never install
+                without asking.
+              </p>
+            </div>
+            <button
+              className="btn-quiet"
+              disabled={updateBusy}
+              onClick={() => {
+                setUpdateBusy(true);
+                void ipc
+                  .checkForUpdate()
+                  .then((r) =>
+                    setUpdateNote(r.available ? `${r.available} available` : r.note),
+                  )
+                  .catch(() => setUpdateNote("check failed"))
+                  .finally(() => setUpdateBusy(false));
+              }}
+            >
+              {updateBusy ? "Checking…" : "Check for updates"}
+            </button>
+          </div>
+          {updateNote && <p className="t-quiet setting__note">{updateNote}</p>}
         </section>
 
         <div className="sheet__actions sheet__actions--end">

@@ -4,11 +4,12 @@
  * chips. Rows expand in place to the full quant table.
  */
 
-import { useMemo, useState, type MouseEvent } from "react";
+import { useEffect, useMemo, useState, type MouseEvent } from "react";
 import { useStore } from "../state/store";
+import { ipc } from "../lib/ipc";
 import { bytesHuman, ctxHuman } from "../lib/format";
 import { CloseIcon } from "../components/Icons";
-import type { CatalogEntry, DownloadProgress, QuantOption, Role } from "../lib/types";
+import type { CatalogEntry, DownloadProgress, OllamaStatus, QuantOption, Role } from "../lib/types";
 
 type Filter = "all" | Role;
 
@@ -244,6 +245,49 @@ function ModelRow({
   );
 }
 
+/** The switching-cost killer, front and center: adopt an existing Ollama
+ *  library in place — zero bytes copied or re-downloaded. */
+function OllamaImport() {
+  const library = useStore((s) => s.library);
+  const [status, setStatus] = useState<OllamaStatus | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<string | null>(null);
+
+  useEffect(() => {
+    void ipc.getOllamaStatus().then(setStatus).catch(() => {});
+  }, []);
+
+  if (!status?.available || status.modelCount === 0) return null;
+  const imported = library.filter((m) => m.source === "ollama").length;
+  if (result === null && imported >= status.modelCount) return null;
+
+  return (
+    <button
+      className="btn-quiet models__import"
+      disabled={busy}
+      onClick={() => {
+        setBusy(true);
+        void ipc
+          .importOllama()
+          .then(async (r) => {
+            useStore.setState({ library: await ipc.listLibrary() });
+            setResult(
+              r.imported > 0
+                ? `${r.imported} adopted — nothing re-downloaded`
+                : "already up to date",
+            );
+          })
+          .catch(() => setResult("import failed — see Operations"))
+          .finally(() => setBusy(false));
+      }}
+    >
+      {busy
+        ? "Importing…"
+        : result ?? `Import from Ollama (${status.modelCount})`}
+    </button>
+  );
+}
+
 export function Models() {
   const catalog = useStore((s) => s.catalog);
   const recs = useStore((s) => s.recommendations);
@@ -282,6 +326,7 @@ export function Models() {
             ? `${shownRunnable} of ${shown} run on this machine · budget ${recs.budgetGb.toFixed(1)} GB`
             : `${shown} ${filter} model${shown === 1 ? "" : "s"} · ${shownRunnable} run on this machine`}
         </span>
+        <OllamaImport />
         <nav className="filters">
           {FILTERS.map((f) => (
             <button

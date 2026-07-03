@@ -191,6 +191,49 @@ async fn start_engine(app: tauri::AppHandle, workspace_id: String) -> Result<()>
     .map_err(|e| error::AthanorError::Runtime(format!("engine task failed: {e}")))?
 }
 
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct UpdateCheck {
+    current_version: String,
+    available: Option<String>,
+    note: String,
+}
+
+/// Update check via the signed-updater plugin. Until the release endpoint is
+/// live this reports honestly instead of erroring cryptically.
+#[tauri::command]
+async fn check_for_update(app: tauri::AppHandle) -> UpdateCheck {
+    use tauri_plugin_updater::UpdaterExt;
+    let current_version = app.package_info().version.to_string();
+    match app.updater() {
+        Ok(updater) => match updater.check().await {
+            Ok(Some(update)) => UpdateCheck {
+                current_version,
+                available: Some(update.version.clone()),
+                note: "an update is available".into(),
+            },
+            Ok(None) => UpdateCheck {
+                current_version,
+                available: None,
+                note: "you are on the latest version".into(),
+            },
+            Err(e) => {
+                log::info!(target: "updater", "check failed (endpoint likely not live yet): {e}");
+                UpdateCheck {
+                    current_version,
+                    available: None,
+                    note: "update service not reachable yet — this build predates the release channel".into(),
+                }
+            }
+        },
+        Err(e) => UpdateCheck {
+            current_version,
+            available: None,
+            note: format!("updater unavailable: {e}"),
+        },
+    }
+}
+
 #[tauri::command]
 fn onboarding_needed(app: tauri::AppHandle) -> Result<bool> {
     Ok(!workspaces::data_root(&app)?.join(".onboarded").exists())
@@ -381,6 +424,7 @@ pub fn run() {
                 let _ = win.unminimize();
             }
         }))
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(
             tauri_plugin_log::Builder::new()
                 .level(log::LevelFilter::Info)
@@ -504,6 +548,7 @@ pub fn run() {
             start_engine,
             onboarding_needed,
             set_onboarded,
+            check_for_update,
             list_operations,
             cancel_operation,
             dismiss_operation,

@@ -108,6 +108,10 @@ const tauriIpc = {
   startEngine: (workspaceId: string) => invoke<void>("start_engine", { workspaceId }),
   onboardingNeeded: () => invoke<boolean>("onboarding_needed"),
   setOnboarded: () => invoke<void>("set_onboarded"),
+  checkForUpdate: () =>
+    invoke<{ currentVersion: string; available: string | null; note: string }>(
+      "check_for_update",
+    ),
 
   onChatDelta: (handler: (d: ChatDelta) => void): Promise<UnlistenFn> =>
     listen<ChatDelta>("chat://delta", (e) => handler(e.payload)),

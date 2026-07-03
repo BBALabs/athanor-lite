@@ -231,6 +231,9 @@ fn bring_up(app: &AppHandle, llm: &Llm, model: &crate::downloads::LibraryModel) 
         .args([
             "-m",
             &model.path,
+            // External clients (/v1/models) see a clean name, not a path.
+            "-a",
+            &model.display_name,
             "-c",
             &CTX_SIZE.to_string(),
             "-ngl",

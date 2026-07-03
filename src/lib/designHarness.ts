@@ -165,6 +165,13 @@ let workspaces: Workspace[] = [
 ];
 let activeId: string | null = "harness-1";
 
+// #onboarding preview starts from a clean garage so the gate logic matches
+// a genuinely fresh install.
+if (typeof window !== "undefined" && window.location.hash === "#onboarding") {
+  workspaces = [];
+  activeId = null;
+}
+
 function list(): WorkspaceList {
   return { workspaces: [...workspaces], activeId, damaged: [] };
 }
@@ -410,8 +417,15 @@ export const harnessIpc = {
     modelName: null,
   }),
   startEngine: async () => {},
-  onboardingNeeded: async () => false,
+  // Design affordance: open http://localhost:1420/#onboarding to style the
+  // first-run flow without wiping real data.
+  onboardingNeeded: async () => window.location.hash === "#onboarding",
   setOnboarded: async () => {},
+  checkForUpdate: async () => ({
+    currentVersion: "0.1.0",
+    available: null,
+    note: "design harness — updates are a desktop concern",
+  }),
 
   createWorkspace: async (args: {
     name: string;

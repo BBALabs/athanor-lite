@@ -717,6 +717,15 @@
 
 /* ── Models — the showroom ─────────────────────────────────── */
 
+.models__import {
+  margin-left: auto;
+  color: var(--lume-warm);
+}
+
+.view-head .models__import + .filters {
+  margin-left: var(--sp-3);
+}
+
 .filters {
   margin-left: auto;
   display: flex;

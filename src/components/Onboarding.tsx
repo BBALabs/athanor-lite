@@ -4,7 +4,7 @@
  * piece of jargon without the user asking for it.
  */
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ipc } from "../lib/ipc";
 import { useStore } from "../state/store";
 import { MarkIcon } from "./Icons";
@@ -43,7 +43,12 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
   const dl = chosenSha ? downloads[chosenSha] : undefined;
   const pct = dl && dl.totalBytes ? (dl.receivedBytes / dl.totalBytes) * 100 : 0;
 
+  // Guards the finish path against double-fire (StrictMode, rapid events).
+  const finishing = useRef(false);
+
   const finish = async () => {
+    if (finishing.current) return;
+    finishing.current = true;
     setStage("finishing");
     try {
       const ws = await ipc.createWorkspace({
@@ -58,6 +63,7 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
       setView("chat");
       onDone();
     } catch (e) {
+      finishing.current = false;
       setError(e instanceof Error ? e.message : String(e));
       setStage("choose");
     }
@@ -75,14 +81,19 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
     void startDownload(entryId, quant);
   };
 
-  // Auto-advance when the chosen download lands.
-  if (stage === "downloading" && dl?.state === "done") {
-    void finish();
-  }
-  if (stage === "downloading" && (dl?.state === "failed" || dl?.state === "cancelled")) {
-    if (!error) setError(dl.error ?? "download did not finish");
-    setStage("choose");
-  }
+  // Auto-advance when the chosen download settles. An effect, never render-
+  // time state changes: finish() has side effects (workspace creation) that
+  // must fire exactly once.
+  useEffect(() => {
+    if (stage !== "downloading" || !dl) return;
+    if (dl.state === "done") {
+      void finish();
+    } else if (dl.state === "failed" || dl.state === "cancelled") {
+      setError(dl.error ?? "download did not finish");
+      setStage("choose");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stage, dl?.state]);
 
   return (
     <div className="onboard">
