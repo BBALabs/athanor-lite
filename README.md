@@ -11,15 +11,27 @@ The app assesses your hardware on launch, recommends the best models your machin
 actually run, and keeps everything sandboxed in its own directory tree — no Python
 installs, no CUDA setup, no conflicts with Docker or existing tooling.
 
-## Status — M1
+## Status — M2 (v1 feature-complete core)
 
 - ✅ Hardware intelligence: CPU/RAM/disk detection, NVML GPU probe with WMI + registry
-  fallback, live 1 Hz telemetry
-- ✅ Curated model catalog (19 entries) + recommendation engine, fit-checked per machine
-- ✅ Workspace create / switch / delete (self-contained directories)
-- ✅ System dashboard, models browser, workspace manager — full custom design system
-- 🔜 M2: one-click model downloads, llama.cpp runtime, chat
-- 🔜 M3: RAG (LanceDB) + memory graph per workspace
+  fallback, architecture identification (Blackwell+), live 1 Hz local monitor
+- ✅ Curated catalog (19 entries) with verified per-quant file manifests (exact sizes,
+  LFS sha256) + recommendation engine, fit-checked per machine
+- ✅ Resumable, checksum-verified model downloads into a content-addressed library
+- ✅ Managed llama.cpp runtime (pinned build, architecture-aware CUDA 12/13/CPU) and
+  streaming chat with measured TTFT / tok/s on every reply
+- ✅ Per-workspace conversations; workspace purpose as standing instruction
+- ✅ Ollama import-in-place (hard links, zero re-download)
+- ✅ Local OpenAI-compatible API (stable port + bearer key, localhost-only)
+- ✅ Local-first performance records; sharing opt-in (default OFF) with the literal
+  payload on screen
+- ✅ Guided onboarding: install → private chat in minutes; data-safety hardening
+  (atomic writes, schema versioning, single-instance, trash-based deletes)
+- 🔜 M3: RAG (LanceDB) + memory graph per workspace, MCP client
+- 🔜 App signing + auto-updater (needs a code-signing certificate)
+
+Dev self-tests (real network + GPU): `ATHANOR_SELFTEST=chat npm run tauri dev` and
+`ATHANOR_SELFTEST=import npm run tauri dev`.
 
 See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full system design and roadmap.
 
