@@ -1,7 +1,13 @@
-/** Typed wrappers over the Tauri IPC surface — the only place `invoke` appears. */
+/**
+ * Typed wrappers over the Tauri IPC surface — the only place `invoke` appears.
+ * In a plain browser tab (UI design work) the design harness stands in for the
+ * Rust core; inside the desktop app the harness is unreachable.
+ */
 
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { IN_TAURI } from "./tauriEnv";
+import { harnessIpc } from "./designHarness";
 import type {
   Catalog,
   HardwareReport,
@@ -11,7 +17,7 @@ import type {
   WorkspaceList,
 } from "./types";
 
-export const ipc = {
+const tauriIpc = {
   detectHardware: () => invoke<HardwareReport>("detect_hardware"),
 
   getRecommendations: (report: HardwareReport) =>
@@ -37,3 +43,7 @@ export const ipc = {
   onTelemetry: (handler: (s: TelemetrySample) => void): Promise<UnlistenFn> =>
     listen<TelemetrySample>("telemetry://sample", (e) => handler(e.payload)),
 };
+
+type Ipc = typeof tauriIpc;
+
+export const ipc: Ipc = IN_TAURI ? tauriIpc : (harnessIpc as Ipc);

@@ -1,51 +1,89 @@
-import { useState } from "react";
-import reactLogo from "./assets/react.svg";
-import { invoke } from "@tauri-apps/api/core";
-import "./App.css";
+import { useEffect, useRef } from "react";
+import { useStore, useLatestSample } from "./state/store";
+import { Titlebar } from "./components/Titlebar";
+import { NavRail } from "./components/NavRail";
+import { BootSequence } from "./components/BootSequence";
+import { Dashboard } from "./views/Dashboard";
+import { Models } from "./views/Models";
+import { Workspaces } from "./views/Workspaces";
+import { AlertIcon, CloseIcon } from "./components/Icons";
 
-function App() {
-  const [greetMsg, setGreetMsg] = useState("");
-  const [name, setName] = useState("");
-
-  async function greet() {
-    // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-    setGreetMsg(await invoke("greet", { name }));
-  }
+function StatusBar() {
+  const sample = useLatestSample();
+  const { workspaces, activeId } = useStore((s) => s.workspaces);
+  const active = workspaces.find((w) => w.id === activeId);
 
   return (
-    <main className="container">
-      <h1>Welcome to Tauri + React</h1>
-
-      <div className="row">
-        <a href="https://vite.dev" target="_blank">
-          <img src="/vite.svg" className="logo vite" alt="Vite logo" />
-        </a>
-        <a href="https://tauri.app" target="_blank">
-          <img src="/tauri.svg" className="logo tauri" alt="Tauri logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
+    <footer className="statusbar">
+      <div className="statusbar__cell">
+        <span className={`statusbar__beat${sample ? " statusbar__beat--live" : ""}`} />
+        <span className="k-num">telemetry {sample ? "1 Hz" : "—"}</span>
       </div>
-      <p>Click on the Tauri, Vite, and React logos to learn more.</p>
-
-      <form
-        className="row"
-        onSubmit={(e) => {
-          e.preventDefault();
-          greet();
-        }}
-      >
-        <input
-          id="greet-input"
-          onChange={(e) => setName(e.currentTarget.value)}
-          placeholder="Enter a name..."
-        />
-        <button type="submit">Greet</button>
-      </form>
-      <p>{greetMsg}</p>
-    </main>
+      <div className="statusbar__cell statusbar__cell--center">
+        {active ? (
+          <>
+            <span className="statusbar__ws-glyph" style={{ ["--ws-hue" as string]: active.accentHue }}>
+              {active.glyph}
+            </span>
+            <span>{active.name}</span>
+          </>
+        ) : (
+          <span className="statusbar__idle">no active workspace</span>
+        )}
+      </div>
+      <div className="statusbar__cell statusbar__cell--right">
+        <span className="k-num">CONDERE 0.1.0 · M1</span>
+      </div>
+    </footer>
   );
 }
 
-export default App;
+function OpErrorToast() {
+  const err = useStore((s) => s.lastOpError);
+  const clear = useStore((s) => s.clearOpError);
+  const timer = useRef<number | undefined>(undefined);
+
+  useEffect(() => {
+    if (!err) return;
+    window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(clear, 7000);
+    return () => window.clearTimeout(timer.current);
+  }, [err, clear]);
+
+  if (!err) return null;
+  return (
+    <div className="toast" role="alert">
+      <AlertIcon size={15} />
+      <span className="toast__msg">{err}</span>
+      <button className="toast__close" onClick={clear} aria-label="Dismiss">
+        <CloseIcon size={11} />
+      </button>
+    </div>
+  );
+}
+
+export default function App() {
+  const boot = useStore((s) => s.boot);
+  const view = useStore((s) => s.view);
+
+  return (
+    <div className="shell">
+      <Titlebar />
+      <div className="shell__body">
+        <NavRail />
+        <main className="shell__main" data-view={view}>
+          {boot === "ready" && (
+            <>
+              {view === "dashboard" && <Dashboard />}
+              {view === "models" && <Models />}
+              {view === "workspaces" && <Workspaces />}
+            </>
+          )}
+        </main>
+      </div>
+      <StatusBar />
+      <OpErrorToast />
+      <BootSequence />
+    </div>
+  );
+}

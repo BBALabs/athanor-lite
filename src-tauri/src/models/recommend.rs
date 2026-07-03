@@ -135,7 +135,7 @@ pub fn recommend(report: &HardwareReport) -> Result<RecommendationSet> {
         .filter(|e| !e.roles.contains(&Role::Embedding))
         .filter_map(|e| make_pick(e, budget_gb, mode))
         .collect();
-    fitting.sort_by(|a, b| b.quality.cmp(&a.quality));
+    fitting.sort_by_key(|p| std::cmp::Reverse(p.quality));
 
     let best = fitting.first().cloned();
     let alternates: Vec<Pick> = fitting.iter().skip(1).take(3).cloned().collect();
