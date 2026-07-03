@@ -46,9 +46,14 @@ export function loadColor(frac: number): string {
 }
 
 export const COMPUTE_CLASS_LABEL: Record<string, { title: string; sub: string }> = {
-  CpuOnly: { title: "CPU CLASS", sub: "no dedicated GPU detected" },
-  VramLow: { title: "COMPACT CLASS", sub: "entry-level GPU acceleration" },
-  VramMid: { title: "PERFORMANCE CLASS", sub: "solid mid-range acceleration" },
-  VramHigh: { title: "ENTHUSIAST CLASS", sub: "high-end single-GPU territory" },
-  VramWorkstation: { title: "WORKSTATION CLASS", sub: "top-tier local inference" },
+  CpuOnly: { title: "CPU class", sub: "no dedicated GPU detected" },
+  VramLow: { title: "Compact class", sub: "entry-level GPU acceleration" },
+  VramMid: { title: "Performance class", sub: "solid mid-range acceleration" },
+  VramHigh: { title: "Enthusiast class", sub: "high-end single-GPU territory" },
+  VramWorkstation: { title: "Workstation class", sub: "top-tier local inference" },
 };
+
+/** Workspace identity: a monogram letterform, never a dingbat. */
+export function monogram(name: string): string {
+  return (name.trim()[0] ?? "·").toUpperCase();
+}

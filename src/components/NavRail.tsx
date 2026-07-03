@@ -1,15 +1,16 @@
 /**
- * NavRail — the app spine. Primary sections up top, the workspace
- * switcher stacked at the bottom like project slots in an IDE.
+ * NavRail — icons floating on the glass, no divider (the spine carries the
+ * edge). Workspace monograms rest at the bottom like garage bays.
  */
 
 import { useStore, type View } from "../state/store";
-import { PulseIcon, SpacesIcon, StackIcon } from "./Icons";
+import { monogram } from "../lib/format";
+import { ModelsIcon, SpacesIcon, SystemIcon } from "./Icons";
 
-const SECTIONS: { view: View; label: string; icon: typeof PulseIcon }[] = [
-  { view: "dashboard", label: "System", icon: PulseIcon },
-  { view: "models", label: "Models", icon: StackIcon },
-  { view: "workspaces", label: "Spaces", icon: SpacesIcon },
+const SECTIONS: { view: View; label: string; icon: typeof SystemIcon }[] = [
+  { view: "dashboard", label: "System", icon: SystemIcon },
+  { view: "models", label: "Models", icon: ModelsIcon },
+  { view: "workspaces", label: "Workspaces", icon: SpacesIcon },
 ];
 
 export function NavRail() {
@@ -27,26 +28,26 @@ export function NavRail() {
             className={`rail__item${view === v ? " rail__item--active" : ""}`}
             onClick={() => setView(v)}
             aria-label={label}
+            title={label}
           >
-            <Icon size={19} />
-            <span className="rail__item-label">{label}</span>
+            <Icon size={21} />
+            <span className="rail__item-light" />
           </button>
         ))}
       </div>
 
       {workspaces.length > 0 && (
         <div className="rail__spaces">
-          <div className="rail__spaces-rule" />
-          {workspaces.slice(0, 6).map((ws) => (
+          {workspaces.slice(0, 5).map((ws) => (
             <button
               key={ws.id}
               className={`rail__space${ws.id === activeId ? " rail__space--active" : ""}`}
               style={{ ["--ws-hue" as string]: ws.accentHue }}
               onClick={() => void activate(ws.id)}
-              title={`${ws.name} — ${ws.purpose || "workspace"}`}
+              title={ws.name}
               aria-label={`Switch to workspace ${ws.name}`}
             >
-              {ws.glyph || ws.name.slice(0, 1).toUpperCase()}
+              {monogram(ws.name)}
             </button>
           ))}
         </div>

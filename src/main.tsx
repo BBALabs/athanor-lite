@@ -2,8 +2,8 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
 
-import "@fontsource-variable/space-grotesk";
-import "@fontsource-variable/inter";
+import "@fontsource-variable/outfit";
+import "@fontsource-variable/instrument-sans";
 import "@fontsource-variable/jetbrains-mono";
 import "./styles/tokens.css";
 import "./styles/base.css";

@@ -1,6 +1,6 @@
 /**
- * Frameless-window titlebar: wordmark, drag surface, hand-drawn window
- * controls. The OS chrome is ours to design.
+ * Titlebar — transparent glass. A small warm wordmark, a drag surface, and
+ * window controls that stay ghosted until approached.
  */
 
 import { useCallback, useEffect, useState } from "react";
@@ -35,12 +35,9 @@ export function Titlebar() {
   return (
     <header className="titlebar" data-tauri-drag-region>
       <div className="titlebar__brand" data-tauri-drag-region>
-        <MarkIcon size={16} className="titlebar__mark" />
+        <MarkIcon size={15} className="titlebar__mark" />
         <span className="titlebar__wordmark" data-tauri-drag-region>
           CONDERE
-        </span>
-        <span className="titlebar__by" data-tauri-drag-region>
-          BLACK BOX ANALYTICS
         </span>
       </div>
 

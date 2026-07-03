@@ -25,3 +25,4 @@ dist-ssr
 
 # local safety backups
 *.bak
+*.bak[0-9]

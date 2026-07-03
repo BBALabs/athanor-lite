@@ -1,4 +1,4 @@
-/* Reset + typographic base. */
+/* Reset + the six-step type system. */
 
 *,
 *::before,
@@ -16,11 +16,12 @@ body,
 }
 
 body {
-  background: var(--bg-0);
+  background: var(--field);
   color: var(--ink-hi);
   font-family: var(--font-ui);
   font-size: 13.5px;
-  line-height: 1.45;
+  font-weight: 450;
+  line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   user-select: none;
@@ -28,7 +29,7 @@ body {
 }
 
 ::selection {
-  background: rgba(168, 85, 247, 0.35);
+  background: rgba(160, 107, 255, 0.3);
 }
 
 button {
@@ -39,71 +40,128 @@ button {
   cursor: pointer;
 }
 
+/* Boxless inputs — a luminous baseline, not a box. */
 input,
 textarea {
   font: inherit;
   color: var(--ink-hi);
-  background: var(--bg-2);
-  border: 1px solid var(--line);
-  border-radius: var(--r-sm);
-  padding: 8px 11px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--ink-ghost);
+  border-radius: 0;
+  padding: 10px 2px;
   outline: none;
-  transition: border-color var(--t-fast) var(--ease-out), box-shadow var(--t-fast) var(--ease-out);
+  transition: border-color var(--t-layout) var(--glide);
 }
 
 input:focus,
 textarea:focus {
-  border-color: var(--line-strong);
-  box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.12);
+  border-bottom-color: var(--lume);
+  box-shadow: 0 12px 24px -16px rgba(160, 107, 255, 0.5);
 }
 
 input::placeholder {
   color: var(--ink-ghost);
 }
 
-/* Scrollbars — thin, violet-tinted, invisible until useful. */
+/* Scrollbars — present only when needed, nearly silent. */
 ::-webkit-scrollbar {
-  width: 9px;
-  height: 9px;
+  width: 8px;
+  height: 8px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(139, 92, 246, 0.18);
-  border-radius: 99px;
+  background: rgba(244, 240, 234, 0.1);
+  border-radius: 8px;
   border: 2px solid transparent;
   background-clip: content-box;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(139, 92, 246, 0.38);
+  background: rgba(244, 240, 234, 0.22);
   background-clip: content-box;
 }
 
-/* Shared micro-typography */
-.k-label {
+/* ── Type steps (the only sizes in the app) ────────────────── */
+
+.t-hero {
   font-family: var(--font-display);
+  font-size: 88px;
+  font-weight: 300;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+  color: var(--ink-hi);
+}
+
+.t-display {
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  color: var(--ink-hi);
+}
+
+.t-readout {
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+  color: var(--ink-hi);
+}
+
+.t-title {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 500;
+  letter-spacing: -0.015em;
+  line-height: 1.2;
+  color: var(--ink-hi);
+}
+
+.t-quiet {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--ink-mid);
+}
+
+.t-label {
+  font-family: var(--font-ui);
   font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.18em;
+  font-weight: 500;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--ink-low);
 }
 
-.k-num {
+.t-mono {
   font-family: var(--font-mono);
+  font-size: 11px;
   font-variant-numeric: tabular-nums;
+  color: var(--ink-mid);
 }
 
-.k-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 2px 8px;
-  border: 1px solid var(--line);
-  border-radius: 99px;
-  font-family: var(--font-mono);
-  font-size: 10.5px;
-  color: var(--ink-mid);
-  white-space: nowrap;
+/* Numerals inside any step */
+.tnum {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+/* ── Accessibility ─────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

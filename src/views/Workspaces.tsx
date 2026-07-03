@@ -1,177 +1,191 @@
 /**
- * Workspaces — purpose-built AI stacks, switched like projects in an IDE.
- * M1 scope: create, activate, delete. Models/RAG/memory attach in M2/M3.
+ * Workspaces — the garage. The active workspace is a hero panel of light;
+ * the rest wait on a low shelf. Creation happens on a glass sheet that
+ * rises from the bottom — boxless fields, curated accents, no rainbow.
  */
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useStore } from "../state/store";
-import { PlusIcon, TrashIcon, CheckIcon } from "../components/Icons";
-import { relativeTime } from "../lib/format";
+import { PlusIcon, TrashIcon } from "../components/Icons";
+import { monogram, relativeTime } from "../lib/format";
 import type { Workspace } from "../lib/types";
 
-const GLYPHS = ["◆", "▲", "●", "■", "✦", "⬢", "◗", "▰"];
-const DEFAULT_HUE = 275;
+/** Curated accent hues — light, never paint. */
+const ACCENTS = [275, 300, 205, 160, 25, 345];
 
-function WorkspaceTile({ ws, active }: { ws: Workspace; active: boolean }) {
-  const activate = useStore((s) => s.activateWorkspace);
+function DeleteControl({ ws }: { ws: Workspace }) {
   const remove = useStore((s) => s.deleteWorkspace);
-  const [armDelete, setArmDelete] = useState(false);
+  const [armed, setArmed] = useState(false);
+
+  useEffect(() => {
+    if (!armed) return;
+    const t = setTimeout(() => setArmed(false), 3500);
+    return () => clearTimeout(t);
+  }, [armed]);
 
   return (
-    <div
-      className={`ws-tile${active ? " ws-tile--active" : ""}`}
-      style={{ ["--ws-hue" as string]: ws.accentHue }}
-      onClick={() => !active && void activate(ws.id)}
-      onMouseLeave={() => setArmDelete(false)}
+    <button
+      className={`ws-delete${armed ? " ws-delete--armed" : ""}`}
+      onClick={(e) => {
+        e.stopPropagation();
+        if (armed) void remove(ws.id);
+        else setArmed(true);
+      }}
+      aria-label={armed ? `Confirm delete ${ws.name}` : `Delete ${ws.name}`}
+      title={armed ? "Click again to permanently delete" : "Delete workspace"}
     >
-      <div className="ws-tile__top">
-        <span className="ws-tile__glyph">{ws.glyph || ws.name.slice(0, 1).toUpperCase()}</span>
-        {active && (
-          <span className="ws-tile__active">
-            <CheckIcon size={11} /> active
-          </span>
-        )}
-      </div>
-      <div className="ws-tile__name">{ws.name}</div>
-      <div className="ws-tile__purpose">{ws.purpose || "general purpose stack"}</div>
-      <div className="ws-tile__foot">
-        <span className="k-num">opened {relativeTime(ws.lastOpenedAt)}</span>
-        <button
-          className={`ws-tile__delete${armDelete ? " ws-tile__delete--armed" : ""}`}
-          onClick={(e) => {
-            e.stopPropagation();
-            if (armDelete) void remove(ws.id);
-            else setArmDelete(true);
-          }}
-          aria-label={armDelete ? `Confirm delete ${ws.name}` : `Delete ${ws.name}`}
-          title={armDelete ? "Click again to permanently delete" : "Delete workspace"}
-        >
-          {armDelete ? "confirm?" : <TrashIcon size={13} />}
-        </button>
-      </div>
-    </div>
+      {armed ? "confirm" : <TrashIcon size={13} />}
+    </button>
   );
 }
 
-function CreateForm({ onDone }: { onDone: () => void }) {
+function CreateSheet({ onDone }: { onDone: () => void }) {
   const createWorkspace = useStore((s) => s.createWorkspace);
   const [name, setName] = useState("");
   const [purpose, setPurpose] = useState("");
-  const [glyph, setGlyph] = useState(GLYPHS[0]);
-  const [hue, setHue] = useState(DEFAULT_HUE);
+  const [hue, setHue] = useState(ACCENTS[0]);
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onDone();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onDone]);
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     if (!name.trim() || busy) return;
     setBusy(true);
-    const ws = await createWorkspace({ name, purpose, accentHue: hue, glyph });
+    const ws = await createWorkspace({
+      name,
+      purpose,
+      accentHue: hue,
+      glyph: monogram(name),
+    });
     setBusy(false);
     if (ws) onDone();
   };
 
   return (
-    <form className="ws-create panel" onSubmit={submit}>
-      <div className="panel__title">
-        <span className="k-label">new workspace</span>
-      </div>
-      <div className="ws-create__grid">
-        <label className="ws-create__field">
-          <span className="k-label">name</span>
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Game Dev Assistant"
-            maxLength={64}
-            autoFocus
-          />
-        </label>
-        <label className="ws-create__field">
-          <span className="k-label">tuned for</span>
-          <input
-            value={purpose}
-            onChange={(e) => setPurpose(e.target.value)}
-            placeholder="Godot scripting, shader help, design docs"
-            maxLength={200}
-          />
-        </label>
-        <div className="ws-create__field">
-          <span className="k-label">glyph</span>
-          <div className="ws-create__glyphs">
-            {GLYPHS.map((g) => (
+    <div className="sheet-veil" onClick={onDone}>
+      <form className="sheet" onClick={(e) => e.stopPropagation()} onSubmit={submit}>
+        <input
+          className="sheet__name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Name a workspace…"
+          maxLength={64}
+          autoFocus
+        />
+        <input
+          className="sheet__purpose"
+          value={purpose}
+          onChange={(e) => setPurpose(e.target.value)}
+          placeholder="What is it tuned for?"
+          maxLength={200}
+        />
+        <div className="sheet__row">
+          <div className="sheet__accents" role="radiogroup" aria-label="Accent">
+            {ACCENTS.map((h) => (
               <button
                 type="button"
-                key={g}
-                className={`glyph-btn${glyph === g ? " glyph-btn--active" : ""}`}
-                style={{ ["--ws-hue" as string]: hue }}
-                onClick={() => setGlyph(g)}
-              >
-                {g}
-              </button>
+                key={h}
+                role="radio"
+                aria-checked={hue === h}
+                className={`accent${hue === h ? " accent--active" : ""}`}
+                style={{ ["--ws-hue" as string]: h }}
+                onClick={() => setHue(h)}
+              />
             ))}
           </div>
-        </div>
-        <label className="ws-create__field">
-          <span className="k-label">accent</span>
-          <div className="ws-create__hue">
-            <input
-              type="range"
-              min={0}
-              max={359}
-              value={hue}
-              onChange={(e) => setHue(Number(e.target.value))}
-              className="hue-slider"
-            />
-            <span className="hue-swatch" style={{ ["--ws-hue" as string]: hue }} />
+          <div className="sheet__actions">
+            <button type="button" className="btn-quiet" onClick={onDone}>
+              Cancel
+            </button>
+            <button type="submit" className="btn-lit" disabled={!name.trim() || busy}>
+              {busy ? "Creating…" : "Create"}
+            </button>
           </div>
-        </label>
-      </div>
-      <div className="ws-create__actions">
-        <button type="button" className="btn-ghost" onClick={onDone}>
-          Cancel
-        </button>
-        <button type="submit" className="btn-primary" disabled={!name.trim() || busy}>
-          {busy ? "Creating…" : "Create workspace"}
-        </button>
-      </div>
-    </form>
+        </div>
+      </form>
+    </div>
   );
 }
 
 export function Workspaces() {
   const { workspaces, activeId } = useStore((s) => s.workspaces);
+  const activate = useStore((s) => s.activateWorkspace);
   const [creating, setCreating] = useState(false);
 
+  const active = workspaces.find((w) => w.id === activeId) ?? null;
+  const shelf = workspaces.filter((w) => w.id !== active?.id);
+
   return (
-    <div className="ws-view">
-      <div className="dash__head">
-        <div>
-          <h1 className="dash__title">Workspaces</h1>
-          <div className="dash__sub k-num">
-            {workspaces.length === 0
-              ? "purpose-built AI stacks — models, RAG, and memory per job"
-              : `${workspaces.length} stack${workspaces.length === 1 ? "" : "s"} · switch like projects in an IDE`}
+    <div className="garage view">
+      <header className="view-head">
+        <h1 className="t-display">Workspaces</h1>
+        <span className="view-head__sub t-quiet">
+          {workspaces.length === 0
+            ? "none yet"
+            : `${workspaces.length} workspace${workspaces.length === 1 ? "" : "s"}`}
+        </span>
+        <button className="btn-quiet view-head__action" onClick={() => setCreating(true)}>
+          <PlusIcon size={13} />
+          New workspace
+        </button>
+      </header>
+
+      {active ? (
+        <section className="garage__hero" style={{ ["--ws-hue" as string]: active.accentHue }}>
+          <div className="garage__hero-sweep" aria-hidden="true" />
+          <span className="garage__hero-monogram" aria-hidden="true">
+            {monogram(active.name)}
+          </span>
+          <div className="garage__hero-body">
+            <span className="t-label">Active</span>
+            <div className="t-display">{active.name}</div>
+            {active.purpose && <div className="t-quiet garage__hero-purpose">{active.purpose}</div>}
+            <div className="t-quiet garage__hero-meta">opened {relativeTime(active.lastOpenedAt)}</div>
           </div>
-        </div>
-      </div>
+          <DeleteControl ws={active} />
+        </section>
+      ) : (
+        <section className="garage__empty" onClick={() => setCreating(true)}>
+          <div className="t-display garage__empty-title">Begin with a workspace</div>
+          <p className="t-quiet">
+            Each workspace is a self-contained stack — its own models, documents, and memory.
+          </p>
+        </section>
+      )}
 
-      {creating && <CreateForm onDone={() => setCreating(false)} />}
+      {shelf.length > 0 && (
+        <section className="garage__shelf">
+          {shelf.map((ws) => (
+            <button
+              key={ws.id}
+              className="bay"
+              style={{ ["--ws-hue" as string]: ws.accentHue }}
+              onClick={() => void activate(ws.id)}
+              title={`Switch to ${ws.name}`}
+            >
+              <span className="bay__monogram" aria-hidden="true">
+                {monogram(ws.name)}
+              </span>
+              <span className="bay__body">
+                <span className="t-title bay__name">{ws.name}</span>
+                <span className="t-quiet bay__meta">
+                  {ws.purpose || `opened ${relativeTime(ws.lastOpenedAt)}`}
+                </span>
+              </span>
+              <DeleteControl ws={ws} />
+            </button>
+          ))}
+        </section>
+      )}
 
-      <div className="ws-grid">
-        {workspaces.map((ws) => (
-          <WorkspaceTile key={ws.id} ws={ws} active={ws.id === activeId} />
-        ))}
-
-        {!creating && (
-          <button className="ws-tile ws-tile--new" onClick={() => setCreating(true)}>
-            <PlusIcon size={22} />
-            <span>New workspace</span>
-            <span className="ws-tile--new-sub">
-              a stack tuned for one job — its own models, documents, memory
-            </span>
-          </button>
-        )}
-      </div>
+      {creating && <CreateSheet onDone={() => setCreating(false)} />}
     </div>
   );
 }

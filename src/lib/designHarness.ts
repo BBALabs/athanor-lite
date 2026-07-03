@@ -211,7 +211,8 @@ export const harnessIpc = {
             name: HW.gpus[0].name,
             vramTotalBytes: HW.gpus[0].vramTotalBytes ?? 0,
             vramUsedBytes: vramUsed,
-            utilizationPct: Math.round(Math.max(0, Math.min(100, cpu * 1.4 + (Math.random() - 0.5) * 16))),
+            // Realistic idle-to-busy band; the warn hue must mean something.
+            utilizationPct: Math.round(Math.max(6, Math.min(68, cpu * 0.9 + (Math.random() - 0.5) * 14))),
             temperatureC: Math.round(46 + cpu / 6),
           },
         ],

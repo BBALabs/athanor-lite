@@ -1,10 +1,10 @@
 /**
- * BootSequence — launch overlay. The ticker lines are the *actual* boot
- * steps from the store; the overlay holds for a minimum beat so the
- * reveal reads as intentional, then lifts.
+ * BootSequence — ignition. The spine light sweeps down, the wordmark's
+ * tracking settles, one quiet progress line fills as the real boot steps
+ * complete. Holds a minimum beat, then the cabin lights come up.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useStore } from "../state/store";
 import { MarkIcon } from "./Icons";
 
@@ -29,38 +29,40 @@ export function BootSequence() {
 
   useEffect(() => {
     if (!done) return;
-    const t = setTimeout(() => setLifted(true), 620);
+    const t = setTimeout(() => setLifted(true), 700);
     return () => clearTimeout(t);
   }, [done]);
+
+  const progress = useMemo(() => {
+    const total = steps.length;
+    const complete = steps.filter((s) => s.state === "done").length;
+    return total ? complete / total : 0;
+  }, [steps]);
+
+  const current = steps.find((s) => s.state === "running") ?? steps.find((s) => s.state === "failed");
 
   if (lifted) return null;
 
   return (
     <div className={`boot${done ? " boot--lift" : ""}`}>
+      <div className="boot__sweep" />
       <div className="boot__center">
-        <div className="boot__mark">
-          <MarkIcon size={40} />
-        </div>
+        <MarkIcon size={34} className="boot__mark" />
         <div className="boot__wordmark">CONDERE</div>
-        <div className="boot__tag">local ai, assembled</div>
 
-        <ol className="boot__steps">
-          {steps.map((s) => (
-            <li key={s.label} className={`boot__step boot__step--${s.state}`}>
-              <span className="boot__step-marker">
-                {s.state === "done" ? "▪" : s.state === "failed" ? "✕" : s.state === "running" ? "▸" : "·"}
-              </span>
-              {s.label}
-            </li>
-          ))}
-        </ol>
+        <div className="boot__progress">
+          <div className="boot__progress-track" />
+          <div className="boot__progress-lit" style={{ width: `${(progress * 100).toFixed(1)}%` }} />
+        </div>
+        <div className={`boot__step t-quiet${boot === "error" ? " boot__step--failed" : ""}`}>
+          {boot === "error" ? "startup fault" : current ? current.label : "ready"}
+        </div>
 
         {boot === "error" && (
           <div className="boot__error">
-            <div className="boot__error-title">Startup fault</div>
-            <div className="boot__error-msg k-num">{bootError}</div>
+            <div className="boot__error-msg t-mono">{bootError}</div>
             <button className="boot__retry" onClick={() => window.location.reload()}>
-              Retry boot
+              Retry
             </button>
           </div>
         )}

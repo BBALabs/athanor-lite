@@ -1,6 +1,7 @@
 /**
  * Condere icon set — drawn in-house on a 24px grid, 1.7px round strokes.
- * No icon library: the set stays small, consistent, and ours.
+ * The keystone mark generates the drawing language; motifs are instrument-
+ * grade, never stock (no bolts, no stacks, no pulses).
  */
 
 import type { SVGProps } from "react";
@@ -31,88 +32,38 @@ export function MarkIcon(props: IconProps) {
   );
 }
 
-export function PulseIcon(props: IconProps) {
+/** System: a calibrated dial — 270° sweep and a needle. */
+export function SystemIcon(props: IconProps) {
   return (
     <svg {...base(props)}>
-      <path d="M3 12h4l2.5-6 4 12L16 12h5" />
+      <path d="M6.34 17.66A8 8 0 1 1 17.66 17.66" />
+      <path d="M12 12l3.6-4.6" />
+      <circle cx="12" cy="12" r="1.1" fill="currentColor" stroke="none" />
     </svg>
   );
 }
 
-export function StackIcon(props: IconProps) {
+/** Models: strata — a ledger of weights, not a stacked cube. */
+export function ModelsIcon(props: IconProps) {
   return (
     <svg {...base(props)}>
-      <path d="M12 3 4 7.5l8 4.5 8-4.5L12 3Z" />
-      <path d="m4 12.5 8 4.5 8-4.5" strokeOpacity={0.75} />
-      <path d="m4 17 8 4.5L20 17" strokeOpacity={0.45} />
+      <path d="M4 6.5h16" />
+      <path d="M4 12h11.5" strokeOpacity={0.75} />
+      <path d="M4 17.5h7" strokeOpacity={0.5} />
+      <circle cx="19.5" cy="12" r="0.9" fill="currentColor" stroke="none" opacity={0.75} />
+      <circle cx="15" cy="17.5" r="0.9" fill="currentColor" stroke="none" opacity={0.5} />
     </svg>
   );
 }
 
+/** Workspaces: rooms — one lit, three at rest. */
 export function SpacesIcon(props: IconProps) {
   return (
     <svg {...base(props)}>
-      <rect x="3.5" y="3.5" width="7.5" height="7.5" rx="1.6" />
-      <rect x="13" y="3.5" width="7.5" height="7.5" rx="1.6" strokeOpacity={0.55} />
-      <rect x="3.5" y="13" width="7.5" height="7.5" rx="1.6" strokeOpacity={0.55} />
-      <path d="M16.75 13.6v6.8M13.35 17h6.8" />
-    </svg>
-  );
-}
-
-export function ChipIcon(props: IconProps) {
-  return (
-    <svg {...base(props)}>
-      <rect x="6.5" y="6.5" width="11" height="11" rx="2" />
-      <rect x="10" y="10" width="4" height="4" rx="0.8" strokeOpacity={0.6} />
-      <path d="M9 3.5v3M15 3.5v3M9 17.5v3M15 17.5v3M3.5 9h3M3.5 15h3M17.5 9h3M17.5 15h3" />
-    </svg>
-  );
-}
-
-export function GpuIcon(props: IconProps) {
-  return (
-    <svg {...base(props)}>
-      <rect x="3.5" y="7" width="17" height="9" rx="1.8" />
-      <circle cx="10" cy="11.5" r="2.4" />
-      <circle cx="16" cy="11.5" r="2.4" strokeOpacity={0.6} />
-      <path d="M5.5 16v3M8.5 16v2M3.5 10H2" strokeOpacity={0.7} />
-    </svg>
-  );
-}
-
-export function RamIcon(props: IconProps) {
-  return (
-    <svg {...base(props)}>
-      <rect x="3" y="8" width="18" height="8" rx="1.4" />
-      <path d="M6.5 8v4.5M10 8v4.5M13.5 8v4.5M17 8v4.5" strokeOpacity={0.6} />
-      <path d="M5 16v2M9 16v2M15 16v2M19 16v2" />
-    </svg>
-  );
-}
-
-export function DiskIcon(props: IconProps) {
-  return (
-    <svg {...base(props)}>
-      <ellipse cx="12" cy="6.5" rx="8" ry="3" />
-      <path d="M4 6.5v11c0 1.66 3.58 3 8 3s8-1.34 8-3v-11" />
-      <path d="M4 12c0 1.66 3.58 3 8 3s8-1.34 8-3" strokeOpacity={0.55} />
-    </svg>
-  );
-}
-
-export function BoltIcon(props: IconProps) {
-  return (
-    <svg {...base(props)}>
-      <path d="M13 3 5 13.5h5.5L11 21l8-10.5h-5.5L13 3Z" />
-    </svg>
-  );
-}
-
-export function CheckIcon(props: IconProps) {
-  return (
-    <svg {...base(props)}>
-      <path d="m4.5 12.5 5 5L19.5 7" />
+      <rect x="4" y="4" width="7" height="7" rx="2" fill="currentColor" stroke="none" opacity={0.9} />
+      <rect x="13.5" y="4" width="7" height="7" rx="2" strokeOpacity={0.5} />
+      <rect x="4" y="13.5" width="7" height="7" rx="2" strokeOpacity={0.5} />
+      <rect x="13.5" y="13.5" width="7" height="7" rx="2" strokeOpacity={0.5} />
     </svg>
   );
 }
@@ -172,14 +123,6 @@ export function CloseIcon(props: IconProps) {
   return (
     <svg {...base({ size: 12, ...props })}>
       <path d="m6 6 12 12M18 6 6 18" />
-    </svg>
-  );
-}
-
-export function ArrowRightIcon(props: IconProps) {
-  return (
-    <svg {...base(props)}>
-      <path d="M4 12h15m0 0-6-6m6 6-6 6" />
     </svg>
   );
 }
