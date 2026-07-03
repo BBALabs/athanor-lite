@@ -1,0 +1,72 @@
+/* ─────────────────────────────────────────────────────────────
+   Condere design tokens — the single source of visual truth.
+   Deep-violet console: dark field, hairline structure, gradient
+   energy reserved for live data and brand moments.
+   ───────────────────────────────────────────────────────────── */
+
+:root {
+  /* Field */
+  --bg-0: #08050f;
+  --bg-1: #0d0817;
+  --bg-2: #130c20;
+  --bg-3: #1a1129;
+
+  /* Surfaces & structure */
+  --panel: rgba(255, 255, 255, 0.022);
+  --panel-hi: rgba(255, 255, 255, 0.045);
+  --line: rgba(168, 85, 247, 0.14);
+  --line-strong: rgba(168, 85, 247, 0.32);
+  --line-faint: rgba(168, 85, 247, 0.07);
+
+  /* Brand */
+  --brand-1: #6b21a8;
+  --brand-2: #a855f7;
+  --brand-3: #e879f9;
+  --violet-300: #c4b5fd;
+  --violet-400: #a78bfa;
+  --violet-500: #8b5cf6;
+
+  /* Ink */
+  --ink-hi: #f2eefc;
+  --ink-mid: #a89fc0;
+  --ink-low: #6b6285;
+  --ink-ghost: #453e5c;
+
+  /* Semantics */
+  --ok: #4ade80;
+  --ok-dim: rgba(74, 222, 128, 0.14);
+  --warn: #fbbf24;
+  --warn-dim: rgba(251, 191, 36, 0.14);
+  --bad: #f87171;
+  --bad-dim: rgba(248, 113, 113, 0.14);
+  --info: #67e8f9;
+  --info-dim: rgba(103, 232, 249, 0.12);
+
+  /* Type */
+  --font-display: "Space Grotesk Variable", "Space Grotesk", sans-serif;
+  --font-ui: "Inter Variable", "Inter", sans-serif;
+  --font-mono: "JetBrains Mono Variable", "JetBrains Mono", monospace;
+
+  /* Rhythm */
+  --r-xs: 4px;
+  --r-sm: 7px;
+  --r-md: 11px;
+  --r-lg: 16px;
+
+  /* Motion */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-spring: cubic-bezier(0.34, 1.4, 0.44, 1);
+  --t-fast: 140ms;
+  --t-med: 280ms;
+  --t-slow: 560ms;
+
+  /* Elevation / glow */
+  --glow-brand: 0 0 24px rgba(168, 85, 247, 0.22);
+  --glow-ok: 0 0 16px rgba(74, 222, 128, 0.25);
+  --shadow-panel: 0 8px 32px rgba(3, 1, 8, 0.55);
+
+  /* Layout */
+  --rail-w: 68px;
+  --titlebar-h: 42px;
+  --statusbar-h: 30px;
+}

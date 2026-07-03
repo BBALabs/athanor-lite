@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "condere",
+  "productName": "Condere",
   "version": "0.1.0",
-  "identifier": "com.tonyw.condere",
+  "identifier": "com.bba.condere",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
@@ -12,13 +12,18 @@
   "app": {
     "windows": [
       {
-        "title": "condere",
-        "width": 800,
-        "height": 600
+        "title": "Condere",
+        "width": 1440,
+        "height": 900,
+        "minWidth": 1100,
+        "minHeight": 720,
+        "center": true,
+        "decorations": false,
+        "backgroundColor": "#0a0612"
       }
     ],
     "security": {
-      "csp": null
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src ipc: http://ipc.localhost"
     }
   },
   "bundle": {

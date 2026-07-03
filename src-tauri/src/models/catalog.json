@@ -1,0 +1,295 @@
+{
+  "version": "2026.07",
+  "entries": [
+    {
+      "id": "llama-3.3-70b-instruct",
+      "family": "Llama",
+      "name": "Llama 3.3 70B Instruct",
+      "paramsB": 70.6,
+      "roles": ["general", "reasoning"],
+      "quality": 95,
+      "contextLength": 131072,
+      "license": "Llama 3.3 Community",
+      "hfRepo": "bartowski/Llama-3.3-70B-Instruct-GGUF",
+      "blurb": "Meta's flagship dense model. GPT-4-class writing and instruction following — the best thing a 48GB+ workstation can run.",
+      "quants": [
+        { "label": "Q4_K_M", "fileGb": 42.5, "minMemGb": 45.5 },
+        { "label": "Q3_K_M", "fileGb": 34.3, "minMemGb": 37.5 }
+      ]
+    },
+    {
+      "id": "qwen2.5-72b-instruct",
+      "family": "Qwen",
+      "name": "Qwen 2.5 72B Instruct",
+      "paramsB": 72.7,
+      "roles": ["general"],
+      "quality": 94,
+      "contextLength": 131072,
+      "license": "Qwen",
+      "hfRepo": "bartowski/Qwen2.5-72B-Instruct-GGUF",
+      "blurb": "Alibaba's strongest dense generalist — excellent multilingual and structured-output work.",
+      "quants": [
+        { "label": "Q4_K_M", "fileGb": 47.4, "minMemGb": 50.5 },
+        { "label": "Q3_K_M", "fileGb": 37.7, "minMemGb": 41.0 }
+      ]
+    },
+    {
+      "id": "qwen3-32b",
+      "family": "Qwen",
+      "name": "Qwen3 32B",
+      "paramsB": 32.8,
+      "roles": ["general", "reasoning"],
+      "quality": 92,
+      "contextLength": 131072,
+      "license": "Apache-2.0",
+      "hfRepo": "Qwen/Qwen3-32B-GGUF",
+      "blurb": "Hybrid thinking model — toggles deep reasoning on demand. The strongest all-rounder in the 24GB class.",
+      "quants": [
+        { "label": "Q4_K_M", "fileGb": 19.8, "minMemGb": 22.0 },
+        { "label": "Q6_K", "fileGb": 26.9, "minMemGb": 29.0 }
+      ]
+    },
+    {
+      "id": "qwq-32b",
+      "family": "Qwen",
+      "name": "QwQ 32B",
+      "paramsB": 32.8,
+      "roles": ["reasoning"],
+      "quality": 91,
+      "contextLength": 131072,
+      "license": "Apache-2.0",
+      "hfRepo": "Qwen/QwQ-32B-GGUF",
+      "blurb": "Dedicated reasoning specialist — chain-of-thought math, logic, and planning that punches at o1-mini weight.",
+      "quants": [
+        { "label": "Q4_K_M", "fileGb": 19.9, "minMemGb": 22.0 }
+      ]
+    },
+    {
+      "id": "deepseek-r1-distill-qwen-32b",
+      "family": "DeepSeek",
+      "name": "DeepSeek R1 Distill Qwen 32B",
+      "paramsB": 32.8,
+      "roles": ["reasoning"],
+      "quality": 90,
+      "contextLength": 131072,
+      "license": "MIT",
+      "hfRepo": "bartowski/DeepSeek-R1-Distill-Qwen-32B-GGUF",
+      "blurb": "R1's reasoning distilled to run on a single card. Shows its work; superb for analysis-heavy workspaces.",
+      "quants": [
+        { "label": "Q4_K_M", "fileGb": 19.9, "minMemGb": 22.0 }
+      ]
+    },
+    {
+      "id": "gpt-oss-20b",
+      "family": "GPT-OSS",
+      "name": "GPT-OSS 20B",
+      "paramsB": 21.0,
+      "roles": ["general", "reasoning"],
+      "quality": 89,
+      "contextLength": 131072,
+      "license": "Apache-2.0",
+      "hfRepo": "ggml-org/gpt-oss-20b-GGUF",
+      "blurb": "OpenAI's open-weight MoE. Native MXFP4 keeps it startlingly light for its capability — a 16GB-card sweet spot.",
+      "quants": [
+        { "label": "MXFP4", "fileGb": 12.1, "minMemGb": 13.5 }
+      ]
+    },
+    {
+      "id": "qwen3-coder-30b-a3b",
+      "family": "Qwen",
+      "name": "Qwen3 Coder 30B-A3B",
+      "paramsB": 30.5,
+      "roles": ["coding"],
+      "quality": 89,
+      "contextLength": 262144,
+      "license": "Apache-2.0",
+      "hfRepo": "unsloth/Qwen3-Coder-30B-A3B-Instruct-GGUF",
+      "blurb": "MoE coder with only 3B active parameters — big-model code quality at small-model speed, huge context.",
+      "quants": [
+        { "label": "Q4_K_M", "fileGb": 18.6, "minMemGb": 20.5 }
+      ]
+    },
+    {
+      "id": "qwen2.5-coder-32b",
+      "family": "Qwen",
+      "name": "Qwen 2.5 Coder 32B",
+      "paramsB": 32.8,
+      "roles": ["coding"],
+      "quality": 88,
+      "contextLength": 131072,
+      "license": "Apache-2.0",
+      "hfRepo": "bartowski/Qwen2.5-Coder-32B-Instruct-GGUF",
+      "blurb": "The reference open coding model — repo-scale comprehension and strong fill-in-the-middle.",
+      "quants": [
+        { "label": "Q4_K_M", "fileGb": 19.9, "minMemGb": 22.0 }
+      ]
+    },
+    {
+      "id": "gemma-3-27b",
+      "family": "Gemma",
+      "name": "Gemma 3 27B",
+      "paramsB": 27.4,
+      "roles": ["general"],
+      "quality": 87,
+      "contextLength": 131072,
+      "license": "Gemma",
+      "hfRepo": "bartowski/google_gemma-3-27b-it-GGUF",
+      "blurb": "Google's open flagship — polished conversational tone and strong multilingual coverage.",
+      "quants": [
+        { "label": "Q4_K_M", "fileGb": 16.5, "minMemGb": 19.0 }
+      ]
+    },
+    {
+      "id": "mistral-small-24b",
+      "family": "Mistral",
+      "name": "Mistral Small 3.1 24B",
+      "paramsB": 24.0,
+      "roles": ["general"],
+      "quality": 86,
+      "contextLength": 131072,
+      "license": "Apache-2.0",
+      "hfRepo": "bartowski/mistralai_Mistral-Small-3.1-24B-Instruct-2503-GGUF",
+      "blurb": "Dense, fast, and Apache-licensed — a dependable workhorse for production workspaces.",
+      "quants": [
+        { "label": "Q4_K_M", "fileGb": 14.3, "minMemGb": 16.0 }
+      ]
+    },
+    {
+      "id": "qwen3-14b",
+      "family": "Qwen",
+      "name": "Qwen3 14B",
+      "paramsB": 14.8,
+      "roles": ["general", "reasoning"],
+      "quality": 84,
+      "contextLength": 131072,
+      "license": "Apache-2.0",
+      "hfRepo": "Qwen/Qwen3-14B-GGUF",
+      "blurb": "Hybrid thinking in a 12GB-card footprint — the best mid-range all-rounder.",
+      "quants": [
+        { "label": "Q4_K_M", "fileGb": 9.0, "minMemGb": 10.0 },
+        { "label": "Q6_K", "fileGb": 12.1, "minMemGb": 13.5 }
+      ]
+    },
+    {
+      "id": "phi-4-14b",
+      "family": "Phi",
+      "name": "Phi-4 14B",
+      "paramsB": 14.7,
+      "roles": ["general", "reasoning"],
+      "quality": 83,
+      "contextLength": 16384,
+      "license": "MIT",
+      "hfRepo": "bartowski/phi-4-GGUF",
+      "blurb": "Microsoft's dense STEM specialist — outsized math and logic for its weight class.",
+      "quants": [
+        { "label": "Q4_K_M", "fileGb": 9.1, "minMemGb": 10.0 }
+      ]
+    },
+    {
+      "id": "qwen2.5-coder-14b",
+      "family": "Qwen",
+      "name": "Qwen 2.5 Coder 14B",
+      "paramsB": 14.8,
+      "roles": ["coding"],
+      "quality": 82,
+      "contextLength": 131072,
+      "license": "Apache-2.0",
+      "hfRepo": "bartowski/Qwen2.5-Coder-14B-Instruct-GGUF",
+      "blurb": "Serious code assistance on a 12GB card — the value pick for coding workspaces.",
+      "quants": [
+        { "label": "Q4_K_M", "fileGb": 9.0, "minMemGb": 10.0 }
+      ]
+    },
+    {
+      "id": "qwen3-8b",
+      "family": "Qwen",
+      "name": "Qwen3 8B",
+      "paramsB": 8.2,
+      "roles": ["general"],
+      "quality": 79,
+      "contextLength": 131072,
+      "license": "Apache-2.0",
+      "hfRepo": "Qwen/Qwen3-8B-GGUF",
+      "blurb": "Snappy daily driver for 8GB cards, with optional thinking mode.",
+      "quants": [
+        { "label": "Q4_K_M", "fileGb": 5.0, "minMemGb": 6.3 }
+      ]
+    },
+    {
+      "id": "llama-3.1-8b-instruct",
+      "family": "Llama",
+      "name": "Llama 3.1 8B Instruct",
+      "paramsB": 8.0,
+      "roles": ["general"],
+      "quality": 78,
+      "contextLength": 131072,
+      "license": "Llama 3.1 Community",
+      "hfRepo": "bartowski/Meta-Llama-3.1-8B-Instruct-GGUF",
+      "blurb": "The most battle-tested small model in the ecosystem — enormous fine-tune and tooling support.",
+      "quants": [
+        { "label": "Q4_K_M", "fileGb": 4.9, "minMemGb": 6.4 },
+        { "label": "Q8_0", "fileGb": 8.5, "minMemGb": 10.0 }
+      ]
+    },
+    {
+      "id": "qwen2.5-coder-7b",
+      "family": "Qwen",
+      "name": "Qwen 2.5 Coder 7B",
+      "paramsB": 7.6,
+      "roles": ["coding"],
+      "quality": 75,
+      "contextLength": 131072,
+      "license": "Apache-2.0",
+      "hfRepo": "bartowski/Qwen2.5-Coder-7B-Instruct-GGUF",
+      "blurb": "Capable autocomplete-and-explain coder that fits almost anywhere.",
+      "quants": [
+        { "label": "Q4_K_M", "fileGb": 4.7, "minMemGb": 6.0 }
+      ]
+    },
+    {
+      "id": "gemma-3-4b",
+      "family": "Gemma",
+      "name": "Gemma 3 4B",
+      "paramsB": 4.3,
+      "roles": ["general"],
+      "quality": 70,
+      "contextLength": 131072,
+      "license": "Gemma",
+      "hfRepo": "bartowski/google_gemma-3-4b-it-GGUF",
+      "blurb": "Remarkably coherent for 4B — the pick for thin laptops and CPU-only machines.",
+      "quants": [
+        { "label": "Q4_K_M", "fileGb": 2.5, "minMemGb": 3.7 }
+      ]
+    },
+    {
+      "id": "llama-3.2-3b-instruct",
+      "family": "Llama",
+      "name": "Llama 3.2 3B Instruct",
+      "paramsB": 3.2,
+      "roles": ["general"],
+      "quality": 66,
+      "contextLength": 131072,
+      "license": "Llama 3.2 Community",
+      "hfRepo": "bartowski/Llama-3.2-3B-Instruct-GGUF",
+      "blurb": "Instant responses on integrated graphics — a fine scratchpad model.",
+      "quants": [
+        { "label": "Q4_K_M", "fileGb": 2.0, "minMemGb": 3.0 }
+      ]
+    },
+    {
+      "id": "nomic-embed-text-v1.5",
+      "family": "Nomic",
+      "name": "Nomic Embed Text v1.5",
+      "paramsB": 0.14,
+      "roles": ["embedding"],
+      "quality": 50,
+      "contextLength": 8192,
+      "license": "Apache-2.0",
+      "hfRepo": "nomic-ai/nomic-embed-text-v1.5-GGUF",
+      "blurb": "The RAG backbone — fast, accurate text embeddings that run alongside any chat model.",
+      "quants": [
+        { "label": "F16", "fileGb": 0.27, "minMemGb": 0.6 }
+      ]
+    }
+  ]
+}
