@@ -876,22 +876,22 @@
   box-shadow: 0 0 7px rgba(231, 192, 136, 0.4);
 }
 
-/* Partial offload — GPU+CPU split: a two-tone jewel (some GPU light, some cool). */
+/* Partial offload — GPU+CPU split: GPU light, dimmed (some layers on CPU). */
 .jewel--partial {
-  background: radial-gradient(circle at 35% 30%, var(--lume-warm), #67e8f9 55%, #2b4a6b);
-  box-shadow: 0 0 7px rgba(103, 232, 249, 0.35);
+  background: radial-gradient(circle at 35% 30%, var(--lume-warm), var(--lume-deep) 62%, #201133);
+  box-shadow: 0 0 6px rgba(160, 107, 255, 0.35);
 }
 
-/* CPU-only — cool, dim: it runs, but not on the GPU. */
+/* CPU-only — neutral ink, no accent light: it runs, but not on the GPU. */
 .jewel--cpu {
-  background: radial-gradient(circle at 35% 30%, rgba(103, 232, 249, 0.5), rgba(103, 232, 249, 0.15) 65%);
+  background: radial-gradient(circle at 35% 30%, rgba(244, 240, 234, 0.3), rgba(244, 240, 234, 0.1) 65%);
 }
 
 .jewel--no {
-  background: radial-gradient(circle at 35% 30%, rgba(244, 240, 234, 0.16), rgba(244, 240, 234, 0.05) 65%);
+  background: radial-gradient(circle at 35% 30%, rgba(244, 240, 234, 0.14), rgba(244, 240, 234, 0.04) 65%);
 }
 
-.quant-table__verdict--partial { color: var(--info, #67e8f9); }
+.quant-table__verdict--partial { color: var(--lume-warm); }
 .quant-table__verdict--cpu { color: var(--ink-low); }
 
 /* In-place expansion */
@@ -1840,7 +1840,7 @@
   margin-left: auto;
 }
 
-/* Drop zone — a lit dashed field, not a boxy uploader. */
+/* Drop zone — a lit field of alpha glass; light, never a dashed box (spec §1). */
 .kb-drop {
   display: flex;
   flex-direction: column;
@@ -1864,9 +1864,9 @@
 .kb-drop::after {
   content: "";
   position: absolute;
-  inset: 10px;
-  border-radius: var(--r-srf);
-  border: 1px dashed var(--line-strong, rgba(160, 107, 255, 0.28));
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 44px -14px rgba(160, 107, 255, 0.3);
   pointer-events: none;
   opacity: 0.5;
   transition: opacity var(--t-hover) var(--glide);
@@ -2117,18 +2117,18 @@
 .toolstep {
   border-radius: var(--r-el);
   background: rgba(0, 0, 0, 0.24);
-  box-shadow: inset 2px 0 0 #67e8f9;
+  box-shadow: inset 2px 0 0 var(--lume);
   overflow: hidden;
 }
 
-.toolstep--fail { box-shadow: inset 2px 0 0 var(--sig-warn, #e0a458); }
+.toolstep--fail { box-shadow: inset 2px 0 0 var(--warn); }
 
 /* The just-fired call in a live turn pulses until the next event lands. */
 .toolstep--live:last-child { animation: toolPulse 1.4s var(--glide) infinite; }
 
 @keyframes toolPulse {
   0%, 100% { background: rgba(0, 0, 0, 0.24); }
-  50% { background: rgba(103, 232, 249, 0.07); }
+  50% { background: rgba(160, 107, 255, 0.08); }
 }
 
 .toolstep__head {
@@ -2141,20 +2141,20 @@
   transition: background var(--t-hover) var(--glide);
 }
 
-.toolstep__head:hover { background: rgba(103, 232, 249, 0.05); }
+.toolstep__head:hover { background: rgba(160, 107, 255, 0.06); }
 
 .toolstep__dot {
   flex: none;
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #67e8f9;
-  box-shadow: 0 0 6px rgba(103, 232, 249, 0.6);
+  background: var(--lume);
+  box-shadow: 0 0 6px rgba(160, 107, 255, 0.6);
 }
 
 .toolstep__dot--fail {
-  background: var(--sig-warn, #e0a458);
-  box-shadow: 0 0 6px rgba(224, 164, 88, 0.6);
+  background: var(--warn);
+  box-shadow: 0 0 6px rgba(231, 192, 136, 0.6);
 }
 
 .toolstep__tool {
@@ -2212,6 +2212,71 @@
   max-height: 220px;
   overflow: auto;
   user-select: text;
+}
+
+/* ══ Premium interaction pass — systematic focus, hover, and motion ══════
+   Reusable primitives so every screen reads the same luxury grammar: focus is
+   light (never a hard outline), hover lifts on a whisper, and the assistant's
+   silence gets a faint spine so it reads as deliberate, not absent. */
+
+/* Focus is light — a soft accent ring, keyboard-only (:focus-visible). */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+[role="switch"]:focus-visible,
+[role="radio"]:focus-visible,
+[tabindex]:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--field), 0 0 0 3px var(--lume), 0 0 16px -2px var(--lume);
+}
+
+/* The assistant's voice gets a faint left spine — deliberate quiet, not absence. */
+.msg--assistant {
+  position: relative;
+  padding-left: 18px;
+}
+
+.msg--assistant::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 2px;
+  bottom: 2px;
+  width: 2px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, transparent, rgba(160, 107, 255, 0.28) 20%, rgba(160, 107, 255, 0.14) 80%, transparent);
+}
+
+/* Tighten the user→assistant pair, breathe before a new user turn. */
+.msg--user + .msg--assistant { margin-top: -10px; }
+.msg--assistant + .msg--user { margin-top: 8px; }
+
+/* Model ledger rows lift and warm on hover (hero has its own sweep). */
+.ledger-row:not(.ledger-row--hero):hover {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 30px -18px rgba(0, 0, 0, 0.7);
+}
+
+/* Fit verdicts brighten on their row's hover. */
+.quant-table__row:hover .quant-table__verdict { filter: brightness(1.12); }
+
+/* The active workspace monogram breathes, slow and shallow. */
+.garage__hero-monogram { animation: monogramBreathe 7s ease-in-out infinite; }
+
+@keyframes monogramBreathe {
+  0%, 100% { opacity: 0.82; }
+  50% { opacity: 1; }
+}
+
+/* Dashboard telemetry cells acknowledge the pointer. */
+.band__cell {
+  border-radius: var(--r-el);
+  transition: background var(--t-hover) var(--glide), transform var(--t-hover) var(--glide);
+}
+.band__cell:hover {
+  transform: translateY(-2px);
+  background: var(--srf-1);
 }
 
 /* ── Degraded subsystem state ──────────────────────────────── */
