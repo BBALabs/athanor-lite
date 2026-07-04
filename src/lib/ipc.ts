@@ -17,6 +17,7 @@ import type {
   ChatToolEvent,
   CoachState,
   Conversation,
+  Preferences,
   SearchHit,
   ConversationMeta,
   KnowledgeBase,
@@ -136,6 +137,11 @@ const tauriIpc = {
   getCoachState: () => invoke<CoachState>("get_coach_state"),
   coachMarkSeen: (id: string) => invoke<CoachState>("coach_mark_seen", { id }),
   coachReset: () => invoke<CoachState>("coach_reset"),
+  getPreferences: () => invoke<Preferences>("get_preferences"),
+  setAccent: (accent: string) => invoke<Preferences>("set_accent", { accent }),
+  getDataRoot: () => invoke<string>("get_data_root"),
+  revealDataRoot: () => invoke<void>("reveal_data_root"),
+  rotateApiKey: () => invoke<ApiInfo>("rotate_api_key"),
   checkForUpdate: () =>
     invoke<{ currentVersion: string; available: string | null; note: string }>(
       "check_for_update",

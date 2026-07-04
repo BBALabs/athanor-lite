@@ -86,6 +86,16 @@ pub fn set_expose(app: &AppHandle, expose: bool) -> Result<ApiSettings> {
     Ok(settings)
 }
 
+/// Issue a fresh API key, invalidating the old one. Existing clients that were
+/// holding the previous key must be updated with the new one.
+pub fn rotate_key(app: &AppHandle, llm: &Llm) -> Result<ApiInfo> {
+    let mut settings = get_settings(app)?;
+    settings.api_key = uuid::Uuid::new_v4().to_string();
+    write_atomic(&path(app)?, serde_json::to_string_pretty(&settings)?.as_bytes())?;
+    log::info!(target: "api", "local API key rotated");
+    info(app, llm)
+}
+
 pub fn info(app: &AppHandle, llm: &Llm) -> Result<ApiInfo> {
     let settings = get_settings(app)?;
     let guard = llm.lock();

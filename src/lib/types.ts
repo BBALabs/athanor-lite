@@ -410,6 +410,12 @@ export interface CoachState {
   seen: string[];
 }
 
+export interface Preferences {
+  schema: number;
+  /** Curated warm-light accent family id: violet | indigo | orchid | rose. */
+  accent: string;
+}
+
 export interface MetricsRecord {
   schema: number;
   ts: string;

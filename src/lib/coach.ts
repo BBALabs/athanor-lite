@@ -47,6 +47,17 @@ export const WALKTHROUGHS: Record<string, Walkthrough> = {
       },
     ],
   },
+  settings: {
+    id: "settings",
+    steps: [
+      {
+        target: "settings-appearance",
+        title: "Make it yours",
+        body: "Recolor the accent, replay any walkthrough, manage the local API key, and open your data folder — it all lives here. The dark glass never changes.",
+        placement: "right",
+      },
+    ],
+  },
   models: {
     id: "models",
     steps: [

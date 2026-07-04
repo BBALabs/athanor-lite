@@ -6,6 +6,7 @@ mod mcp;
 mod metrics;
 mod models;
 mod ops;
+mod preferences;
 mod rag;
 mod runtime;
 mod uistate;
@@ -399,6 +400,53 @@ fn onboarding_needed(app: tauri::AppHandle) -> Result<bool> {
 fn set_onboarded(app: tauri::AppHandle) -> Result<()> {
     std::fs::write(workspaces::data_root(&app)?.join(".onboarded"), b"1")?;
     Ok(())
+}
+
+#[tauri::command]
+fn get_preferences(app: tauri::AppHandle) -> Result<preferences::Preferences> {
+    preferences::load(&app)
+}
+
+#[tauri::command]
+fn set_accent(app: tauri::AppHandle, accent: String) -> Result<preferences::Preferences> {
+    preferences::set_accent(&app, &accent)
+}
+
+#[tauri::command]
+fn get_data_root(app: tauri::AppHandle) -> Result<String> {
+    Ok(workspaces::data_root(&app)?.to_string_lossy().to_string())
+}
+
+/// Open the app's data folder in the OS file manager. Cross-platform.
+#[tauri::command]
+fn reveal_data_root(app: tauri::AppHandle) -> Result<()> {
+    let dir = workspaces::data_root(&app)?;
+    #[cfg(target_os = "windows")]
+    let mut cmd = {
+        let mut c = std::process::Command::new("explorer");
+        c.arg(&dir);
+        c
+    };
+    #[cfg(target_os = "macos")]
+    let mut cmd = {
+        let mut c = std::process::Command::new("open");
+        c.arg(&dir);
+        c
+    };
+    #[cfg(target_os = "linux")]
+    let mut cmd = {
+        let mut c = std::process::Command::new("xdg-open");
+        c.arg(&dir);
+        c
+    };
+    // explorer.exe returns a non-zero status even on success; just launch it.
+    let _ = cmd.spawn();
+    Ok(())
+}
+
+#[tauri::command]
+fn rotate_api_key(app: tauri::AppHandle, llm: tauri::State<'_, Llm>) -> Result<runtime::api::ApiInfo> {
+    runtime::api::rotate_key(&app, &llm)
 }
 
 #[tauri::command]
@@ -927,6 +975,11 @@ pub fn run() {
             coach_mark_seen,
             coach_reset,
             get_templates,
+            get_preferences,
+            set_accent,
+            get_data_root,
+            reveal_data_root,
+            rotate_api_key,
             check_for_update,
             list_operations,
             cancel_operation,

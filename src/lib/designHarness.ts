@@ -282,6 +282,7 @@ let onChatDoneHandler: ((d: ChatDone) => void) | null = null;
 let onChatToolHandler: ((t: unknown) => void) | null = null;
 let onOpsHandler: ((ops: Operation[]) => void) | null = null;
 let harnessCoachSeen: string[] = [];
+let harnessAccent = "violet";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const harnessDocs: any[] = [
@@ -686,6 +687,20 @@ export const harnessIpc = {
     harnessCoachSeen = [];
     return { schema: 1, seen: harnessCoachSeen };
   },
+  getPreferences: async () => ({ schema: 1, accent: harnessAccent }),
+  setAccent: async (accent: string) => {
+    harnessAccent = accent;
+    return { schema: 1, accent: harnessAccent };
+  },
+  getDataRoot: async () => "C:\\Users\\you\\AppData\\Roaming\\com.bba.athanor",
+  revealDataRoot: async () => {},
+  rotateApiKey: async () => ({
+    expose: true,
+    running: true,
+    baseUrl: "http://127.0.0.1:11435/v1",
+    apiKey: `harness-${Math.abs((Date.now() % 1e9) | 0).toString(16)}`,
+    modelName: "Llama 3.2 3B Instruct",
+  }),
   checkForUpdate: async () => ({
     currentVersion: "0.1.0",
     available: null,

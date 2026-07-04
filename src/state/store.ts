@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { ipc } from "../lib/ipc";
 import { getWalkthrough } from "../lib/coach";
+import { applyAccent } from "../lib/theme";
 import {
   isAthanorError,
   type Catalog,
@@ -88,6 +89,9 @@ interface AthanorStore {
   /** The walkthrough playing right now, and which step. */
   activeCoach: { id: string; step: number } | null;
 
+  /** App-wide accent family id (persisted preference). */
+  accent: string;
+
   setView: (v: View) => void;
   dismissOnboarding: () => void;
   setOpsOpen: (open: boolean) => void;
@@ -136,6 +140,9 @@ interface AthanorStore {
   advanceCoach: () => void;
   endCoach: (opts?: { seen?: boolean }) => void;
   replayCoaches: () => Promise<void>;
+
+  // Preferences
+  setAccent: (id: string) => Promise<void>;
 }
 
 function errText(e: unknown): string {
@@ -185,6 +192,7 @@ export const useStore = create<AthanorStore>((set, get) => ({
   liveToolSteps: [],
   coachSeen: [],
   activeCoach: null,
+  accent: "violet",
 
   setView: (view) => set({ view }),
   dismissOnboarding: () => set({ onboardingNeeded: false }),
@@ -466,6 +474,15 @@ export const useStore = create<AthanorStore>((set, get) => ({
       }
     } catch (e) {
       console.error("chat streams unavailable", e);
+    }
+
+    // App preferences (accent) — apply before first paint of any view.
+    try {
+      const prefs = await ipc.getPreferences();
+      set({ accent: prefs.accent });
+      applyAccent(prefs.accent);
+    } catch {
+      /* default violet stands */
     }
 
     // Which walkthroughs the user has already seen (quiet — optional sugar).
@@ -836,6 +853,16 @@ export const useStore = create<AthanorStore>((set, get) => ({
     try {
       await ipc.coachReset();
       set({ coachSeen: [], activeCoach: null });
+    } catch (e) {
+      set({ lastOpError: errText(e) });
+    }
+  },
+
+  setAccent: async (id) => {
+    applyAccent(id); // paint immediately — zero perceived latency
+    set({ accent: id });
+    try {
+      await ipc.setAccent(id);
     } catch (e) {
       set({ lastOpError: errText(e) });
     }

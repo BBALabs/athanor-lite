@@ -14,6 +14,7 @@ import { Models } from "./views/Models";
 import { Workspaces } from "./views/Workspaces";
 import { AlertIcon, CloseIcon } from "./components/Icons";
 import { monogram } from "./lib/format";
+import { ACCENT_PRESETS } from "./lib/theme";
 
 /**
  * The Ambient Spine — the app's one light source. It breathes, flares once
@@ -21,6 +22,7 @@ import { monogram } from "./lib/format";
  */
 function Spine() {
   const view = useStore((s) => s.view);
+  const accent = useStore((s) => s.accent);
   const sample = useLatestSample();
 
   const gpu = sample?.gpus[0];
@@ -29,8 +31,12 @@ function Spine() {
     gpu ? gpu.vramUsedBytes / Math.max(1, gpu.vramTotalBytes) : 0,
   );
 
+  // --spine-c is a registered @property, so a var() reference would freeze at
+  // parse time; feed the concrete accent color so it repaints when accent changes.
+  const lume = (ACCENT_PRESETS.find((a) => a.id === accent) ?? ACCENT_PRESETS[0]).lume;
+
   return (
-    <div className="spine" style={{ ["--spine-c" as string]: load > 0.85 ? "var(--warn)" : "var(--lume)" }}>
+    <div className="spine" style={{ ["--spine-c" as string]: load > 0.85 ? "var(--warn)" : lume }}>
       <div className="spine__halo" />
       <div className="spine__band" />
       <div className="spine__flare" key={view} />

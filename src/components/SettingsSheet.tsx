@@ -1,12 +1,13 @@
 /**
- * Settings — a glass sheet with three quiet sections: performance records
- * (local-first, consent with the literal payload on screen), the local
- * OpenAI-compatible API, and library import.
+ * Settings — a glass sheet of quiet sections: appearance, performance records
+ * (local-first consent, the literal payload on screen), the local
+ * OpenAI-compatible API, library import, your data folder, and updates.
  */
 
 import { useEffect, useState } from "react";
 import { ipc } from "../lib/ipc";
 import { useStore } from "../state/store";
+import { ACCENT_PRESETS } from "../lib/theme";
 import type { ApiInfo, ImportReport, MetricsSettings, OllamaStatus } from "../lib/types";
 
 function Toggle({ on, onChange, label }: { on: boolean; onChange: (v: boolean) => void; label: string }) {
@@ -43,6 +44,11 @@ function Copyable({ value }: { value: string }) {
 }
 
 export function SettingsSheet({ onDone }: { onDone: () => void }) {
+  const accent = useStore((s) => s.accent);
+  const setAccent = useStore((s) => s.setAccent);
+  const replayCoaches = useStore((s) => s.replayCoaches);
+  const maybeStartCoach = useStore((s) => s.maybeStartCoach);
+
   const [metrics, setMetrics] = useState<MetricsSettings | null>(null);
   const [sample, setSample] = useState<string>("");
   const [showSample, setShowSample] = useState(false);
@@ -53,6 +59,9 @@ export function SettingsSheet({ onDone }: { onDone: () => void }) {
   const [importing, setImporting] = useState(false);
   const [updateBusy, setUpdateBusy] = useState(false);
   const [updateNote, setUpdateNote] = useState<string | null>(null);
+  const [dataRoot, setDataRoot] = useState("");
+  const [replayed, setReplayed] = useState(false);
+  const [rotated, setRotated] = useState(false);
 
   useEffect(() => {
     void ipc.getMetricsSettings().then(setMetrics).catch(() => {});
@@ -63,17 +72,60 @@ export function SettingsSheet({ onDone }: { onDone: () => void }) {
     void ipc.getMetricsHistory(500).then((h) => setRecordCount(h.length)).catch(() => {});
     void ipc.getApiInfo().then(setApi).catch(() => {});
     void ipc.getOllamaStatus().then(setOllama).catch(() => {});
+    void ipc.getDataRoot().then(setDataRoot).catch(() => {});
+    maybeStartCoach("settings");
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onDone();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onDone]);
+  }, [onDone, maybeStartCoach]);
 
   return (
     <div className="sheet-veil" onClick={onDone}>
       <div className="sheet sheet--settings" onClick={(e) => e.stopPropagation()}>
         <div className="t-display">Settings</div>
+
+        {/* ── Appearance ──────────────────────────── */}
+        <section className="setting" data-coach="settings-appearance">
+          <div className="setting__head">
+            <div>
+              <div className="t-title">Appearance</div>
+              <p className="t-quiet setting__blurb">
+                The light the interface glows in. The dark glass stays — only the accent
+                changes.
+              </p>
+            </div>
+          </div>
+          <div className="pref-accents" role="radiogroup" aria-label="Accent">
+            {ACCENT_PRESETS.map((p) => (
+              <button
+                key={p.id}
+                role="radio"
+                aria-checked={accent === p.id}
+                className={`pref-accent${accent === p.id ? " pref-accent--active" : ""}`}
+                style={{ ["--swatch" as string]: p.lume }}
+                onClick={() => void setAccent(p.id)}
+                title={p.label}
+              >
+                <span className="pref-accent__disc" />
+                <span className="t-quiet">{p.label}</span>
+              </button>
+            ))}
+          </div>
+          <div className="setting__row setting__row--between">
+            <span className="t-quiet">Guided walkthroughs</span>
+            <button
+              className="btn-quiet"
+              onClick={() => {
+                void replayCoaches();
+                setReplayed(true);
+              }}
+            >
+              {replayed ? "Tutorials reset" : "Replay tutorials"}
+            </button>
+          </div>
+        </section>
 
         {/* ── Performance records ─────────────────── */}
         <section className="setting">
@@ -136,6 +188,25 @@ export function SettingsSheet({ onDone }: { onDone: () => void }) {
                 <span className="t-quiet">API key</span>
                 <Copyable value={api.apiKey} />
               </div>
+              <div className="setting__row setting__row--between">
+                <span className="t-quiet">
+                  {rotated ? "New key issued — update your clients" : "Compromised? Issue a fresh key."}
+                </span>
+                <button
+                  className="btn-quiet"
+                  onClick={() => {
+                    void ipc
+                      .rotateApiKey()
+                      .then((info) => {
+                        setApi(info);
+                        setRotated(true);
+                      })
+                      .catch(() => {});
+                  }}
+                >
+                  Regenerate key
+                </button>
+              </div>
             </div>
           )}
         </section>
@@ -179,6 +250,28 @@ export function SettingsSheet({ onDone }: { onDone: () => void }) {
                 ? ` · ${importReport.skipped.length} skipped (${importReport.skipped.join("; ")})`
                 : ""}
             </p>
+          )}
+        </section>
+
+        {/* ── Data ────────────────────────────────── */}
+        <section className="setting">
+          <div className="setting__head">
+            <div>
+              <div className="t-title">Your data</div>
+              <p className="t-quiet setting__blurb">
+                Models, workspaces, chats, and settings all live in one folder — nothing is
+                written anywhere else. Back it up or move it with a file manager.
+              </p>
+            </div>
+            <button className="btn-quiet" onClick={() => void ipc.revealDataRoot()}>
+              Open folder
+            </button>
+          </div>
+          {dataRoot && (
+            <div className="setting__row">
+              <span className="t-quiet">Location</span>
+              <span className="t-mono setting__path">{dataRoot}</span>
+            </div>
           )}
         </section>
 
