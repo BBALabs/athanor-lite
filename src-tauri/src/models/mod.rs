@@ -2,6 +2,7 @@
 //! recommends models it can stand behind, not a scrape of the Hub.
 
 pub mod recommend;
+pub mod templates;
 
 use std::sync::OnceLock;
 

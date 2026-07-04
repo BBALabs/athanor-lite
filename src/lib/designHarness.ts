@@ -631,6 +631,7 @@ export const harnessIpc = {
     purpose: string;
     accentHue: number;
     glyph: string;
+    templateId?: string | null;
   }): Promise<Workspace> => {
     const now = new Date().toISOString();
     const ws: Workspace = {
@@ -644,11 +645,23 @@ export const harnessIpc = {
       lastOpenedAt: now,
       modelRefs: [],
       activeModel: null,
+      templateId: args.templateId ?? null,
     };
     workspaces = [ws, ...workspaces];
     activeId = ws.id;
     return ws;
   },
+
+  getTemplates: async () => ({
+    version: "1",
+    templates: [
+      { id: "code-assistant", name: "Code Assistant", description: "Writes, reviews, and debugs code — with the reasoning shown.", glyph: "C", accentHue: 205, purpose: "Write, review, and debug code. Explain the reasoning behind changes and prefer idiomatic, well-tested solutions.", modelRole: "coding", ragEnabled: false, suggestedTools: ["a filesystem server, to read the files in your project", "a git server, for history and diffs"] },
+      { id: "document-reviewer", name: "Document Reviewer", description: "Answers from your own documents, and cites the passages.", glyph: "D", accentHue: 160, purpose: "Answer questions about the documents in this workspace. Cite the source passages and say plainly when the answer isn't in them.", modelRole: "general", ragEnabled: true, suggestedTools: [] },
+      { id: "creative-writer", name: "Creative Writer", description: "A drafting partner for prose, scripts, and copy.", glyph: "W", accentHue: 345, purpose: "Help draft and refine writing. Match the requested tone, keep prose tight, and offer specific alternatives over vague praise.", modelRole: "general", ragEnabled: false, suggestedTools: [] },
+      { id: "research-assistant", name: "Research Assistant", description: "Investigates a question and synthesizes what it finds.", glyph: "R", accentHue: 275, purpose: "Investigate topics and synthesize findings. Reason step by step, weigh sources, and separate what's established from what's speculative.", modelRole: "reasoning", ragEnabled: true, suggestedTools: ["a web-fetch or search server, for live sources"] },
+      { id: "math-tutor", name: "Math Tutor", description: "Teaches math step by step, checking understanding.", glyph: "M", accentHue: 25, purpose: "Tutor math step by step. Show every step, explain the why, and check the student's understanding before moving on.", modelRole: "reasoning", ragEnabled: false, suggestedTools: [] },
+    ],
+  }),
 
   activateWorkspace: async (id: string): Promise<Workspace> => {
     const ws = workspaces.find((w) => w.id === id);

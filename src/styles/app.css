@@ -1237,6 +1237,119 @@
   gap: var(--sp-1);
 }
 
+.sheet__from {
+  font-size: 12px;
+  margin-bottom: -6px;
+}
+
+.sheet__from-name {
+  color: var(--lume-warm);
+}
+
+/* ── Workspace template gallery — the zero-friction start path ── */
+
+.sheet--gallery {
+  gap: var(--sp-3);
+  max-height: 82vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.tpl-gallery {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  min-height: 0;
+}
+
+.tpl-gallery__head {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tpl-gallery__head p {
+  max-width: 60ch;
+  line-height: 1.6;
+}
+
+.tpl-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow-y: auto;
+  min-height: 0;
+  margin: 0 calc(-1 * var(--sp-1));
+  padding: 0 var(--sp-1);
+}
+
+/* A light row — lifts and warms on hover; no border, no card. */
+.tpl {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  width: 100%;
+  padding: 14px 16px;
+  border-radius: var(--r-el);
+  text-align: left;
+  transition: background var(--t-hover) var(--glide), transform var(--t-hover) var(--glide);
+}
+
+.tpl:hover {
+  background: var(--srf-2);
+  transform: translateY(-1px);
+}
+
+.tpl__monogram {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-el);
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 300;
+  color: hsl(var(--ws-hue), 70%, 82%);
+  background: radial-gradient(circle at 38% 32%, hsla(var(--ws-hue), 60%, 55%, 0.28), hsla(var(--ws-hue), 60%, 40%, 0.08) 70%);
+  box-shadow: 0 0 20px -6px hsla(var(--ws-hue), 70%, 60%, 0.5);
+}
+
+.tpl__monogram--blank {
+  color: var(--ink-low);
+  background: var(--srf-2);
+  box-shadow: none;
+}
+
+.tpl__body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.tpl__name {
+  color: var(--ink-hi);
+}
+
+.tpl__desc {
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.tpl__tag {
+  flex: none;
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--lume-warm);
+  opacity: 0.85;
+}
+
+.tpl--blank {
+  margin-top: 4px;
+}
+
 /* ── Buttons — quiet by default, lit when primary ──────────── */
 
 .btn-quiet {

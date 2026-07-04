@@ -34,6 +34,7 @@ import type {
   RuntimeState,
   ServerStatus,
   TelemetrySample,
+  TemplateSet,
   Workspace,
   WorkspaceList,
 } from "./types";
@@ -53,7 +54,10 @@ const tauriIpc = {
     purpose: string;
     accentHue: number;
     glyph: string;
+    templateId?: string | null;
   }) => invoke<Workspace>("create_workspace", args),
+
+  getTemplates: () => invoke<TemplateSet>("get_templates"),
 
   activateWorkspace: (id: string) =>
     invoke<Workspace>("activate_workspace", { id }),

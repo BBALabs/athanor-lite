@@ -164,6 +164,23 @@ runtime process is spawned with its working directory inside the workspace; dele
 workspace deletes exactly its directory and releases (refcounted) model references.
 Nothing is ever written outside the app data root.
 
+**Templates** (`models/templates.json`, embedded like the catalog) make a new workspace a
+working stack in one click instead of a blank form — the zero-friction default create path.
+Each names a model *role* (never a specific id, so it can't break as the catalog evolves), a
+crafted system-prompt/purpose, an accent, RAG intent, and plain-language tool suggestions
+(never auto-installed — the user decides). A startup test binds every template's role to the
+catalog. On create, if the user already has a model of that role installed, the recommender
+resolves the best one and the workspace is ready to chat on arrival; otherwise the model
+chooser guides them. Five ship: Code Assistant, Document Reviewer, Creative Writer, Research
+Assistant, Math Tutor (plus Blank).
+
+**Guided walkthroughs** (`uistate` module + `src/components/Coach.tsx`): the app teaches
+itself by doing. A reusable coach spotlights a *real* control (dimming four panels around it
+so it stays interactive), says one plain sentence, and advances when the user performs the
+action. The seen-set persists to `coach.json`; each walkthrough fires once, is always
+skippable, and "replay the tutorials" resets them. Feature views call `maybeStartCoach(id)`
+on first entry; steps anchor to `data-coach` attributes.
+
 ## 7. Frontend architecture
 
 ```

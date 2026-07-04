@@ -30,6 +30,23 @@ export interface Walkthrough {
  * Anchors are `data-coach="…"` attributes on the real controls.
  */
 export const WALKTHROUGHS: Record<string, Walkthrough> = {
+  workspaces: {
+    id: "workspaces",
+    steps: [
+      {
+        title: "Workspaces are your AI setups",
+        body: "Each one is a self-contained stack — its own model, documents, memory, and tools — that you switch between like projects in an editor.",
+        placement: "center",
+      },
+      {
+        target: "new-workspace",
+        title: "Start from a ready-made setup",
+        body: "Pick a starting point — Code Assistant, Document Reviewer, and more — and it arrives pre-configured with a fitting model and the right defaults.",
+        placement: "bottom",
+        advanceOnClick: true,
+      },
+    ],
+  },
   knowledge: {
     id: "knowledge",
     steps: [

@@ -434,9 +434,15 @@ fn create_workspace(
     purpose: String,
     accent_hue: u16,
     glyph: String,
+    template_id: Option<String>,
 ) -> Result<Workspace> {
     let _guard = lock.acquire();
-    workspaces::create(&app, &name, &purpose, accent_hue, &glyph)
+    workspaces::create(&app, &name, &purpose, accent_hue, &glyph, template_id)
+}
+
+#[tauri::command]
+fn get_templates() -> Result<&'static models::templates::TemplateSet> {
+    models::templates::templates()
 }
 
 #[tauri::command]
@@ -480,7 +486,7 @@ fn selftest_chat(app: &tauri::AppHandle) -> Result<String> {
     let ws_list = workspaces::list(app)?;
     let ws = match ws_list.workspaces.iter().find(|w| w.name == "Self Test") {
         Some(w) => w.clone(),
-        None => workspaces::create(app, "Self Test", "pipeline verification", 275, "S")?,
+        None => workspaces::create(app, "Self Test", "pipeline verification", 275, "S", None)?,
     };
     workspaces::set_active_model(app, &ws.id, Some(model.sha256.clone()))?;
 
@@ -516,7 +522,7 @@ fn selftest_serve(app: &tauri::AppHandle) -> Result<String> {
     let ws_list = workspaces::list(app)?;
     let ws = match ws_list.workspaces.iter().find(|w| w.name == "Self Test") {
         Some(w) => w.clone(),
-        None => workspaces::create(app, "Self Test", "pipeline verification", 275, "S")?,
+        None => workspaces::create(app, "Self Test", "pipeline verification", 275, "S", None)?,
     };
     workspaces::set_active_model(app, &ws.id, Some(model.sha256.clone()))?;
     let llm = app.state::<Llm>();
@@ -544,7 +550,7 @@ fn selftest_rag(app: &tauri::AppHandle) -> Result<String> {
     let ws_list = workspaces::list(app)?;
     let ws = match ws_list.workspaces.iter().find(|w| w.name == "RAG Test") {
         Some(w) => w.clone(),
-        None => workspaces::create(app, "RAG Test", "Meridian reactor documentation", 200, "R")?,
+        None => workspaces::create(app, "RAG Test", "Meridian reactor documentation", 200, "R", None)?,
     };
     workspaces::set_active_model(app, &ws.id, Some(model.sha256.clone()))?;
 
@@ -591,7 +597,7 @@ fn selftest_mcp(app: &tauri::AppHandle) -> Result<String> {
     let ws_list = workspaces::list(app)?;
     let ws = match ws_list.workspaces.iter().find(|w| w.name == "MCP Test") {
         Some(w) => w.clone(),
-        None => workspaces::create(app, "MCP Test", "tool connectivity", 25, "M")?,
+        None => workspaces::create(app, "MCP Test", "tool connectivity", 25, "M", None)?,
     };
     let cfg = mcp::McpServerConfig {
         id: "everything".into(),
@@ -625,7 +631,7 @@ fn selftest_agentic(app: &tauri::AppHandle) -> Result<String> {
     let ws_list = workspaces::list(app)?;
     let ws = match ws_list.workspaces.iter().find(|w| w.name == "Agentic Test") {
         Some(w) => w.clone(),
-        None => workspaces::create(app, "Agentic Test", "autonomous tool use", 155, "A")?,
+        None => workspaces::create(app, "Agentic Test", "autonomous tool use", 155, "A", None)?,
     };
     workspaces::set_active_model(app, &ws.id, Some(model.sha256.clone()))?;
 
@@ -884,6 +890,7 @@ pub fn run() {
             get_coach_state,
             coach_mark_seen,
             coach_reset,
+            get_templates,
             check_for_update,
             list_operations,
             cancel_operation,

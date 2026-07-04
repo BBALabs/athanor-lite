@@ -17,6 +17,7 @@ import {
   type ServerStatus,
   type Source,
   type TelemetrySample,
+  type Template,
   type ToolStep,
   type Workspace,
   type WorkspaceList,
@@ -49,6 +50,8 @@ interface AthanorStore {
   catalog: Catalog | null;
   telemetry: TelemetrySample[];
   workspaces: WorkspaceList;
+  /** Curated starting points for new workspaces (loaded once). */
+  templates: Template[];
   library: LibraryModel[];
   /** Live download progress, keyed by artifact sha256. */
   downloads: Record<string, DownloadProgress>;
@@ -115,6 +118,7 @@ interface AthanorStore {
     purpose: string;
     accentHue: number;
     glyph: string;
+    templateId?: string | null;
   }) => Promise<Workspace | null>;
   activateWorkspace: (id: string) => Promise<void>;
   deleteWorkspace: (id: string) => Promise<void>;
@@ -154,6 +158,7 @@ export const useStore = create<AthanorStore>((set, get) => ({
   catalog: null,
   telemetry: [],
   workspaces: { workspaces: [], activeId: null, damaged: [] },
+  templates: [],
   library: [],
   downloads: {},
   lastOpError: null,
@@ -463,6 +468,13 @@ export const useStore = create<AthanorStore>((set, get) => ({
       /* coaches simply all show once if this fails */
     }
 
+    // Workspace templates (quiet — the create sheet falls back to Blank if absent).
+    try {
+      set({ templates: (await ipc.getTemplates()).templates });
+    } catch {
+      /* templates are optional starting points */
+    }
+
     try {
       const needed = await ipc.onboardingNeeded();
       const s = get();
@@ -647,6 +659,38 @@ export const useStore = create<AthanorStore>((set, get) => ({
   createWorkspace: async (args) => {
     try {
       const ws = await ipc.createWorkspace(args);
+      // Zero-friction: if the template wants a kind of model the user already
+      // has installed, wire it up so the workspace is ready to chat on arrival.
+      if (args.templateId) {
+        const s = get();
+        const tpl = s.templates.find((t) => t.id === args.templateId);
+        const role = tpl?.modelRole;
+        if (role && s.library.length > 0) {
+          const catalog = s.catalog;
+          const qualityOf = (entryId: string | null) =>
+            (entryId && catalog?.entries.find((e) => e.id === entryId)?.quality) || 0;
+          const roleEntries = new Set(
+            (catalog?.entries ?? []).filter((e) => e.roles.includes(role)).map((e) => e.id),
+          );
+          // Prefer the model the recommender picked for this role; otherwise the
+          // strongest installed model that serves it. (Ollama imports may carry
+          // no catalog id — they simply don't match a role and are skipped.)
+          const recommended = s.recommendations?.byRole.find((r) => r.role === role)?.pick.entryId;
+          let chosen = recommended ? s.library.find((m) => m.entryId === recommended) : undefined;
+          if (!chosen) {
+            chosen = s.library
+              .filter((m) => m.entryId !== null && roleEntries.has(m.entryId))
+              .sort((a, b) => qualityOf(b.entryId) - qualityOf(a.entryId))[0];
+          }
+          if (chosen) {
+            try {
+              await ipc.setWorkspaceModel(ws.id, chosen.sha256);
+            } catch {
+              /* leave unset — the model chooser will guide them */
+            }
+          }
+        }
+      }
       set({ workspaces: await ipc.listWorkspaces() });
       await get().loadConversations();
       return ws;

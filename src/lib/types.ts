@@ -215,6 +215,26 @@ export interface Workspace {
   modelRefs: string[];
   /** Library model (sha256) this workspace chats with. */
   activeModel: string | null;
+  /** The template this workspace was created from, if any. */
+  templateId?: string | null;
+}
+
+/** An opinionated starting point for a new workspace. */
+export interface Template {
+  id: string;
+  name: string;
+  description: string;
+  glyph: string;
+  accentHue: number;
+  purpose: string;
+  modelRole: Role;
+  ragEnabled: boolean;
+  suggestedTools: string[];
+}
+
+export interface TemplateSet {
+  version: string;
+  templates: Template[];
 }
 
 export interface WorkspaceList {

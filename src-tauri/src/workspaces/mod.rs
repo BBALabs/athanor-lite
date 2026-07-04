@@ -62,6 +62,10 @@ pub struct Workspace {
     /// The model (library sha256) this workspace chats with, if chosen.
     #[serde(default)]
     pub active_model: Option<String>,
+    /// The template this workspace was created from, if any — informational,
+    /// used to tailor first-run guidance.
+    #[serde(default)]
+    pub template_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -235,6 +239,7 @@ pub fn create(
     purpose: &str,
     accent_hue: u16,
     glyph: &str,
+    template_id: Option<String>,
 ) -> Result<Workspace> {
     let name = name.trim();
     if name.is_empty() {
@@ -256,6 +261,7 @@ pub fn create(
         last_opened_at: now,
         model_refs: Vec::new(),
         active_model: None,
+        template_id,
     };
 
     let dir = workspace_dir(app, &ws.id)?;
