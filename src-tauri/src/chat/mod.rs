@@ -511,8 +511,21 @@ pub fn send(
     });
     conv.updated_at = now;
     save(app, &conv)?;
-    let conv_id = conv.id.clone();
 
+    run_generation(app, llm, ops, conv, &model_sha)
+}
+
+/// Run the generation op over a conversation whose turns are already in place
+/// (used by send, regenerate, and edit-and-resend). Registers in the ops
+/// registry, streams, and reports failures on the done channel.
+fn run_generation(
+    app: &AppHandle,
+    llm: &Llm,
+    ops: &Ops,
+    mut conv: Conversation,
+    model_sha: &str,
+) -> Result<String> {
+    let conv_id = conv.id.clone();
     let cancel = ops
         .begin(
             app,
@@ -544,10 +557,101 @@ pub fn send(
                     error: Some(e.to_string()),
                 },
             );
-            metrics::record_failure(app, &model_sha, &e.to_string());
+            metrics::record_failure(app, model_sha, &e.to_string());
             Err(e)
         }
     }
+}
+
+fn active_model(app: &AppHandle, workspace_id: &str) -> Result<String> {
+    workspaces::list(app)?
+        .workspaces
+        .iter()
+        .find(|w| w.id == workspace_id)
+        .and_then(|w| w.active_model.clone())
+        .ok_or_else(|| AthanorError::Chat("no model selected for this workspace".into()))
+}
+
+/// Regenerate the last assistant reply: drop trailing assistant turn(s) and run
+/// generation again over the same user turn.
+pub fn regenerate(
+    app: &AppHandle,
+    llm: &Llm,
+    ops: &Ops,
+    workspace_id: &str,
+    conversation_id: &str,
+) -> Result<String> {
+    let model_sha = active_model(app, workspace_id)?;
+    let mut conv = load(app, workspace_id, conversation_id)?;
+    while conv.messages.last().map(|m| m.role == "assistant").unwrap_or(false) {
+        conv.messages.pop();
+    }
+    if conv.messages.last().map(|m| m.role != "user").unwrap_or(true) {
+        return Err(AthanorError::Chat("nothing to regenerate".into()));
+    }
+    conv.model_sha = Some(model_sha.clone());
+    save(app, &conv)?;
+    run_generation(app, llm, ops, conv, &model_sha)
+}
+
+/// Edit a user turn and resend: replace its content, drop everything after it,
+/// and regenerate from there.
+pub fn edit_and_resend(
+    app: &AppHandle,
+    llm: &Llm,
+    ops: &Ops,
+    workspace_id: &str,
+    conversation_id: &str,
+    message_index: usize,
+    new_content: String,
+) -> Result<String> {
+    let model_sha = active_model(app, workspace_id)?;
+    let mut conv = load(app, workspace_id, conversation_id)?;
+    if message_index >= conv.messages.len() || conv.messages[message_index].role != "user" {
+        return Err(AthanorError::Chat("can only edit a message you sent".into()));
+    }
+    if new_content.trim().is_empty() {
+        return Err(AthanorError::Chat("the edited message is empty".into()));
+    }
+    conv.messages.truncate(message_index + 1);
+    let m = &mut conv.messages[message_index];
+    m.content = new_content;
+    m.ts = chrono::Utc::now().to_rfc3339();
+    m.stats = None;
+    m.sources = Vec::new();
+    m.tool_steps = Vec::new();
+    conv.model_sha = Some(model_sha.clone());
+    save(app, &conv)?;
+    run_generation(app, llm, ops, conv, &model_sha)
+}
+
+/// Fork a conversation at a message: a new conversation with the history up to
+/// and including that message, so a different direction can be explored.
+pub fn fork(
+    app: &AppHandle,
+    workspace_id: &str,
+    conversation_id: &str,
+    upto: usize,
+) -> Result<String> {
+    let src = load(app, workspace_id, conversation_id)?;
+    let keep = (upto + 1).min(src.messages.len());
+    if keep == 0 {
+        return Err(AthanorError::Chat("nothing to branch from".into()));
+    }
+    let now = chrono::Utc::now().to_rfc3339();
+    let title: String = src.title.chars().take(44).collect();
+    let forked = Conversation {
+        schema: 1,
+        id: uuid::Uuid::new_v4().to_string(),
+        workspace_id: workspace_id.to_string(),
+        title: format!("↳ {title}"),
+        model_sha: src.model_sha.clone(),
+        created_at: now.clone(),
+        updated_at: now,
+        messages: src.messages[..keep].to_vec(),
+    };
+    save(app, &forked)?;
+    Ok(forked.id)
 }
 
 fn generate(app: &AppHandle, llm: &Llm, conv: &mut Conversation, cancel: &AtomicBool) -> Result<()> {
@@ -1038,6 +1142,42 @@ mod tests {
         let content = "café ☕ RÉACTEUR details about the Meridian core";
         let s = snippet(content, "réacteur");
         assert!(s.to_lowercase().contains("réacteur"));
+    }
+
+    #[test]
+    fn dropping_trailing_assistant_leaves_a_user_turn() {
+        // The regenerate transform: pop trailing assistant turns.
+        let mut msgs = vec![msg("user", "a"), msg("assistant", "b"), msg("assistant", "c")];
+        while msgs.last().map(|m| m.role == "assistant").unwrap_or(false) {
+            msgs.pop();
+        }
+        assert_eq!(msgs.len(), 1);
+        assert_eq!(msgs.last().unwrap().role, "user");
+    }
+
+    #[test]
+    fn edit_truncates_after_the_edited_turn() {
+        // The edit-and-resend transform: keep [0..=index], drop the rest.
+        let mut msgs = vec![
+            msg("user", "q1"),
+            msg("assistant", "a1"),
+            msg("user", "q2"),
+            msg("assistant", "a2"),
+        ];
+        let index = 0usize; // edit the first user turn
+        msgs.truncate(index + 1);
+        assert_eq!(msgs.len(), 1);
+        assert_eq!(msgs[0].content, "q1");
+    }
+
+    #[test]
+    fn fork_keeps_history_up_to_and_including_the_point() {
+        let msgs = vec![msg("user", "q1"), msg("assistant", "a1"), msg("user", "q2")];
+        let upto = 1usize;
+        let keep = (upto + 1).min(msgs.len());
+        let branched = &msgs[..keep];
+        assert_eq!(branched.len(), 2);
+        assert_eq!(branched.last().unwrap().content, "a1");
     }
 
     #[test]

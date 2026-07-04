@@ -167,6 +167,48 @@ fn cancel_generation(ops: tauri::State<'_, Ops>, conversation_id: String) {
     chat::cancel(&ops, &conversation_id);
 }
 
+#[tauri::command]
+async fn regenerate_reply(
+    app: tauri::AppHandle,
+    workspace_id: String,
+    conversation_id: String,
+) -> Result<String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let llm = app.state::<Llm>();
+        let ops = app.state::<Ops>();
+        chat::regenerate(&app, &llm, &ops, &workspace_id, &conversation_id)
+    })
+    .await
+    .map_err(|e| error::AthanorError::Chat(format!("regenerate task failed: {e}")))?
+}
+
+#[tauri::command]
+async fn edit_and_resend(
+    app: tauri::AppHandle,
+    workspace_id: String,
+    conversation_id: String,
+    message_index: usize,
+    content: String,
+) -> Result<String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let llm = app.state::<Llm>();
+        let ops = app.state::<Ops>();
+        chat::edit_and_resend(&app, &llm, &ops, &workspace_id, &conversation_id, message_index, content)
+    })
+    .await
+    .map_err(|e| error::AthanorError::Chat(format!("edit task failed: {e}")))?
+}
+
+#[tauri::command]
+fn fork_conversation(
+    app: tauri::AppHandle,
+    workspace_id: String,
+    conversation_id: String,
+    upto: usize,
+) -> Result<String> {
+    chat::fork(&app, &workspace_id, &conversation_id, upto)
+}
+
 // ── Operations registry surface ───────────────────────────────
 
 #[tauri::command]
@@ -1075,6 +1117,9 @@ pub fn run() {
             rename_conversation,
             search_conversations,
             export_conversation,
+            regenerate_reply,
+            edit_and_resend,
+            fork_conversation,
             stop_engine,
             get_metrics_settings,
             set_metrics_share,

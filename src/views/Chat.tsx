@@ -338,6 +338,91 @@ function SearchResults({
   );
 }
 
+/** A single message with hover actions: copy, edit (user), regenerate (last
+ *  assistant), and branch. User messages edit inline and resend. */
+function ChatBubble({
+  m,
+  index,
+  isLastAssistant,
+}: {
+  m: ChatMessage;
+  index: number;
+  isLastAssistant: boolean;
+}) {
+  const editMessage = useStore((s) => s.editMessage);
+  const regenerate = useStore((s) => s.regenerateReply);
+  const fork = useStore((s) => s.forkAt);
+  const generating = useStore((s) => s.generating);
+  const [editing, setEditing] = useState(false);
+  const [text, setText] = useState(m.content);
+  const [copied, setCopied] = useState(false);
+
+  const copy = () =>
+    void navigator.clipboard?.writeText(m.content).then(() => {
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1200);
+    });
+
+  if (m.role === "user" && editing) {
+    return (
+      <div className="msg msg--user msg--editing">
+        <textarea
+          className="msg__edit"
+          value={text}
+          autoFocus
+          rows={Math.min(10, Math.max(2, text.split("\n").length))}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              setEditing(false);
+              void editMessage(index, text);
+            } else if (e.key === "Escape") {
+              setEditing(false);
+              setText(m.content);
+            }
+          }}
+        />
+        <div className="msg__edit-actions">
+          <button className="btn-quiet" onClick={() => { setEditing(false); setText(m.content); }}>
+            Cancel
+          </button>
+          <button className="btn-lit" onClick={() => { setEditing(false); void editMessage(index, text); }}>
+            Save &amp; resend
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`msg msg--${m.role}`}>
+      {m.role === "assistant" && m.toolSteps?.length > 0 && <ToolSteps steps={m.toolSteps} />}
+      {m.role === "assistant" ? <Markdown text={m.content} /> : m.content}
+      {m.role === "assistant" && m.sources?.length > 0 && <Sources sources={m.sources} />}
+      {m.role === "assistant" && <StatsLine msg={m} />}
+      <div className="msg__actions">
+        <button className="msg__act" onClick={copy}>
+          {copied ? "copied" : "copy"}
+        </button>
+        {m.role === "user" && !generating && (
+          <button className="msg__act" onClick={() => { setText(m.content); setEditing(true); }}>
+            edit
+          </button>
+        )}
+        {isLastAssistant && !generating && (
+          <button className="msg__act" onClick={() => void regenerate()}>
+            regenerate
+          </button>
+        )}
+        <button className="msg__act" onClick={() => void fork(index)} title="Branch a new conversation from here">
+          branch
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function Chat() {
   const { workspaces, activeId } = useStore((s) => s.workspaces);
   const conversations = useStore((s) => s.conversations);
@@ -398,6 +483,11 @@ export function Chat() {
   useEffect(() => {
     if (ws?.activeModel) maybeStartCoach("prompts");
   }, [ws?.activeModel, maybeStartCoach]);
+
+  // Once a real exchange exists, point out the per-message actions.
+  useEffect(() => {
+    if ((activeConv?.messages.length ?? 0) >= 2) maybeStartCoach("chatactions");
+  }, [activeConv?.messages.length, maybeStartCoach]);
 
   const openFromSearch = (id: string) => {
     setQuery("");
@@ -518,7 +608,7 @@ export function Chat() {
             <ModelChooser />
           ) : (
             <>
-              <div className="thread" ref={threadRef}>
+              <div className="thread" ref={threadRef} data-coach="thread">
                 {!activeConv && !generating && (
                   <div className="thread__empty">
                     <div className="t-display thread__empty-title">
@@ -530,14 +620,12 @@ export function Chat() {
                   </div>
                 )}
                 {activeConv?.messages.map((m, i) => (
-                  <div key={i} className={`msg msg--${m.role}`}>
-                    {m.role === "assistant" && m.toolSteps?.length > 0 && (
-                      <ToolSteps steps={m.toolSteps} />
-                    )}
-                    {m.role === "assistant" ? <Markdown text={m.content} /> : m.content}
-                    {m.role === "assistant" && m.sources?.length > 0 && <Sources sources={m.sources} />}
-                    {m.role === "assistant" && <StatsLine msg={m} />}
-                  </div>
+                  <ChatBubble
+                    key={i}
+                    m={m}
+                    index={i}
+                    isLastAssistant={m.role === "assistant" && i === activeConv.messages.length - 1}
+                  />
                 ))}
                 {generating && (
                   <div className="msg msg--assistant">

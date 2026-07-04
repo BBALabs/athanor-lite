@@ -520,6 +520,33 @@ export const harnessIpc = {
     if (c) c.title = title.trim().slice(0, 80) || "Untitled";
     return harnessIpc.listConversations(workspaceId);
   },
+  regenerateReply: async (_workspaceId: string, conversationId: string) => {
+    const c = harnessConvs.find((x) => x.id === conversationId);
+    if (c) {
+      while (c.messages.length && c.messages[c.messages.length - 1].role === "assistant") c.messages.pop();
+      c.messages.push({ role: "assistant", content: "(regenerated) A fresh take on the same question.", ts: new Date().toISOString(), stats: null, sources: [], toolSteps: [] });
+      c.updatedAt = new Date().toISOString();
+    }
+    return conversationId;
+  },
+  editAndResend: async (_workspaceId: string, conversationId: string, messageIndex: number, content: string) => {
+    const c = harnessConvs.find((x) => x.id === conversationId);
+    if (c) {
+      c.messages = c.messages.slice(0, messageIndex + 1);
+      c.messages[messageIndex] = { role: "user", content, ts: new Date().toISOString(), stats: null, sources: [], toolSteps: [] };
+      c.messages.push({ role: "assistant", content: "(edited) Responding to your revised message.", ts: new Date().toISOString(), stats: null, sources: [], toolSteps: [] });
+      c.updatedAt = new Date().toISOString();
+    }
+    return conversationId;
+  },
+  forkConversation: async (_workspaceId: string, conversationId: string, upto: number) => {
+    const c = harnessConvs.find((x) => x.id === conversationId);
+    const id = `conv-fork-${Date.now()}`;
+    if (c) {
+      harnessConvs.unshift({ ...c, id, title: `↳ ${c.title}`, messages: c.messages.slice(0, upto + 1).map((m) => ({ ...m })), updatedAt: new Date().toISOString() });
+    }
+    return id;
+  },
   searchConversations: async (workspaceId: string, query: string) => {
     const q = query.trim().toLowerCase();
     if (!q) return [];

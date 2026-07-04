@@ -109,6 +109,13 @@ const tauriIpc = {
   renameConversation: (workspaceId: string, conversationId: string, title: string) =>
     invoke<ConversationMeta[]>("rename_conversation", { workspaceId, conversationId, title }),
 
+  regenerateReply: (workspaceId: string, conversationId: string) =>
+    invoke<string>("regenerate_reply", { workspaceId, conversationId }),
+  editAndResend: (workspaceId: string, conversationId: string, messageIndex: number, content: string) =>
+    invoke<string>("edit_and_resend", { workspaceId, conversationId, messageIndex, content }),
+  forkConversation: (workspaceId: string, conversationId: string, upto: number) =>
+    invoke<string>("fork_conversation", { workspaceId, conversationId, upto }),
+
   searchConversations: (workspaceId: string, query: string) =>
     invoke<SearchHit[]>("search_conversations", { workspaceId, query }),
 

@@ -97,6 +97,17 @@ export const WALKTHROUGHS: Record<string, Walkthrough> = {
       },
     ],
   },
+  chatactions: {
+    id: "chatactions",
+    steps: [
+      {
+        target: "thread",
+        title: "Every message has options",
+        body: "Hover any message to copy it, or to branch a new conversation from that point and explore a different direction. Edit one of your own turns to resend it, or regenerate the last reply for another take.",
+        placement: "left",
+      },
+    ],
+  },
   prompts: {
     id: "prompts",
     steps: [

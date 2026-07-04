@@ -120,6 +120,9 @@ interface AthanorStore {
   stopGeneration: () => Promise<void>;
   removeConversation: (id: string) => Promise<void>;
   renameConversation: (id: string, title: string) => Promise<void>;
+  regenerateReply: () => Promise<void>;
+  editMessage: (index: number, content: string) => Promise<void>;
+  forkAt: (index: number) => Promise<void>;
   exportConversation: (id: string, format: "markdown" | "json", dest: string) => Promise<void>;
   searchConversations: (query: string) => Promise<void>;
   clearSearch: () => void;
@@ -667,6 +670,85 @@ export const useStore = create<AthanorStore>((set, get) => ({
         conversations,
         activeConv: s.activeConv?.id === id ? null : s.activeConv,
       }));
+    } catch (e) {
+      set({ lastOpError: errText(e) });
+    }
+  },
+
+  regenerateReply: async () => {
+    const s = get();
+    const conv = s.activeConv;
+    const wsId = s.workspaces.activeId;
+    if (!conv || !wsId || conv.id === PENDING_CONV || s.generating) return;
+    const msgs = [...conv.messages];
+    while (msgs.length && msgs[msgs.length - 1].role === "assistant") msgs.pop();
+    set({
+      activeConv: { ...conv, messages: msgs },
+      generating: true,
+      streamText: "",
+      liveSources: [],
+      liveToolSteps: [],
+    });
+    try {
+      await ipc.regenerateReply(wsId, conv.id);
+      const [c, list] = await Promise.all([
+        ipc.getConversation(wsId, conv.id),
+        ipc.listConversations(wsId),
+      ]);
+      set({ activeConv: c, conversations: list, generating: false, streamText: null });
+    } catch (e) {
+      set({ generating: false, streamText: null, lastOpError: errText(e) });
+      try {
+        set({ activeConv: await ipc.getConversation(wsId, conv.id) });
+      } catch {
+        /* keep optimistic */
+      }
+    }
+  },
+
+  editMessage: async (index, content) => {
+    const s = get();
+    const conv = s.activeConv;
+    const wsId = s.workspaces.activeId;
+    if (!conv || !wsId || conv.id === PENDING_CONV || s.generating || !content.trim()) return;
+    const msgs = conv.messages.slice(0, index + 1);
+    msgs[index] = { ...msgs[index], content };
+    set({
+      activeConv: { ...conv, messages: msgs },
+      generating: true,
+      streamText: "",
+      liveSources: [],
+      liveToolSteps: [],
+    });
+    try {
+      await ipc.editAndResend(wsId, conv.id, index, content);
+      const [c, list] = await Promise.all([
+        ipc.getConversation(wsId, conv.id),
+        ipc.listConversations(wsId),
+      ]);
+      set({ activeConv: c, conversations: list, generating: false, streamText: null });
+    } catch (e) {
+      set({ generating: false, streamText: null, lastOpError: errText(e) });
+      try {
+        set({ activeConv: await ipc.getConversation(wsId, conv.id) });
+      } catch {
+        /* keep optimistic */
+      }
+    }
+  },
+
+  forkAt: async (index) => {
+    const s = get();
+    const conv = s.activeConv;
+    const wsId = s.workspaces.activeId;
+    if (!conv || !wsId || conv.id === PENDING_CONV) return;
+    try {
+      const newId = await ipc.forkConversation(wsId, conv.id, index);
+      const [c, list] = await Promise.all([
+        ipc.getConversation(wsId, newId),
+        ipc.listConversations(wsId),
+      ]);
+      set({ activeConv: c, conversations: list });
     } catch (e) {
       set({ lastOpError: errText(e) });
     }
