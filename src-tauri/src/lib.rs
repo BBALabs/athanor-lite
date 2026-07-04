@@ -6,6 +6,7 @@ mod mcp;
 mod metrics;
 mod models;
 mod ops;
+mod portable;
 mod preferences;
 mod rag;
 mod runtime;
@@ -415,6 +416,11 @@ fn set_accent(app: tauri::AppHandle, accent: String) -> Result<preferences::Pref
 #[tauri::command]
 fn get_data_root(app: tauri::AppHandle) -> Result<String> {
     Ok(workspaces::data_root(&app)?.to_string_lossy().to_string())
+}
+
+#[tauri::command]
+fn is_portable() -> bool {
+    portable::is_portable()
 }
 
 /// Open the app's data folder in the OS file manager. Cross-platform.
@@ -845,12 +851,23 @@ pub fn run() {
                 .level(log::LevelFilter::Info)
                 .max_file_size(1_000_000)
                 .rotation_strategy(tauri_plugin_log::RotationStrategy::KeepAll)
-                .targets([
-                    tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Stdout),
-                    tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::LogDir {
-                        file_name: Some("athanor".into()),
-                    }),
-                ])
+                .targets({
+                    // Portable installs keep logs beside the executable; a normal
+                    // install uses the OS log directory.
+                    let file_target = match portable::portable_root() {
+                        Some(root) => tauri_plugin_log::TargetKind::Folder {
+                            path: root.join("logs"),
+                            file_name: Some("athanor".into()),
+                        },
+                        None => tauri_plugin_log::TargetKind::LogDir {
+                            file_name: Some("athanor".into()),
+                        },
+                    };
+                    [
+                        tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Stdout),
+                        tauri_plugin_log::Target::new(file_target),
+                    ]
+                })
                 .build(),
         )
         .manage(WsLock::default())
@@ -932,9 +949,10 @@ pub fn run() {
             }
 
             log::info!(
-                "Athanor {} online (data root: {:?})",
+                "Athanor {} online ({} mode, data root: {:?})",
                 env!("CARGO_PKG_VERSION"),
-                app.path().app_data_dir().ok()
+                if portable::is_portable() { "portable" } else { "installed" },
+                workspaces::data_root(app.handle()).ok()
             );
             Ok(())
         })
@@ -979,6 +997,7 @@ pub fn run() {
             set_accent,
             get_data_root,
             reveal_data_root,
+            is_portable,
             rotate_api_key,
             check_for_update,
             list_operations,

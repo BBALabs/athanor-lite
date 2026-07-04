@@ -12,7 +12,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Manager};
+use tauri::AppHandle;
 
 use crate::error::{AthanorError, Result};
 
@@ -117,10 +117,10 @@ fn quarantine(path: &Path) {
 // ── Paths ─────────────────────────────────────────────────────
 
 pub fn data_root(app: &AppHandle) -> Result<PathBuf> {
-    let root = app
-        .path()
-        .app_data_dir()
-        .map_err(|e| AthanorError::Path(e.to_string()))?;
+    // The single choke point for the data root — portable mode redirects it to
+    // a folder beside the executable, and everything else (models, runtimes,
+    // workspaces, chats, RAG, metrics, logs) flows from here unchanged.
+    let root = crate::portable::root(app)?;
     fs::create_dir_all(root.join("workspaces"))?;
     Ok(root)
 }

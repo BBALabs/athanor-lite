@@ -60,6 +60,7 @@ export function SettingsSheet({ onDone }: { onDone: () => void }) {
   const [updateBusy, setUpdateBusy] = useState(false);
   const [updateNote, setUpdateNote] = useState<string | null>(null);
   const [dataRoot, setDataRoot] = useState("");
+  const [portable, setPortable] = useState(false);
   const [replayed, setReplayed] = useState(false);
   const [rotated, setRotated] = useState(false);
 
@@ -73,6 +74,7 @@ export function SettingsSheet({ onDone }: { onDone: () => void }) {
     void ipc.getApiInfo().then(setApi).catch(() => {});
     void ipc.getOllamaStatus().then(setOllama).catch(() => {});
     void ipc.getDataRoot().then(setDataRoot).catch(() => {});
+    void ipc.isPortable().then(setPortable).catch(() => {});
     maybeStartCoach("settings");
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onDone();
@@ -257,10 +259,14 @@ export function SettingsSheet({ onDone }: { onDone: () => void }) {
         <section className="setting">
           <div className="setting__head">
             <div>
-              <div className="t-title">Your data</div>
+              <div className="t-title">
+                Your data
+                {portable && <span className="setting__badge">Portable</span>}
+              </div>
               <p className="t-quiet setting__blurb">
-                Models, workspaces, chats, and settings all live in one folder — nothing is
-                written anywhere else. Back it up or move it with a file manager.
+                {portable
+                  ? "Running portable — everything lives in the folder beside the app, nothing in your user profile or registry. Copy that folder to take your whole setup with you."
+                  : "Models, workspaces, chats, and settings all live in one folder — nothing is written anywhere else. Back it up or move it with a file manager. Drop a file named athanor-portable next to the app to run fully portable."}
               </p>
             </div>
             <button className="btn-quiet" onClick={() => void ipc.revealDataRoot()}>

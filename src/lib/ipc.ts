@@ -141,6 +141,7 @@ const tauriIpc = {
   setAccent: (accent: string) => invoke<Preferences>("set_accent", { accent }),
   getDataRoot: () => invoke<string>("get_data_root"),
   revealDataRoot: () => invoke<void>("reveal_data_root"),
+  isPortable: () => invoke<boolean>("is_portable"),
   rotateApiKey: () => invoke<ApiInfo>("rotate_api_key"),
   checkForUpdate: () =>
     invoke<{ currentVersion: string; available: string | null; note: string }>(

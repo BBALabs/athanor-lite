@@ -694,6 +694,7 @@ export const harnessIpc = {
   },
   getDataRoot: async () => "C:\\Users\\you\\AppData\\Roaming\\com.bba.athanor",
   revealDataRoot: async () => {},
+  isPortable: async () => false,
   rotateApiKey: async () => ({
     expose: true,
     running: true,
