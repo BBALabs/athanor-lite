@@ -186,8 +186,8 @@ let workspaces: Workspace[] = [
     glyph: "◆",
     createdAt: new Date(Date.now() - 86400000 * 12).toISOString(),
     lastOpenedAt: new Date(Date.now() - 3600000 * 2).toISOString(),
-    modelRefs: ["harness-llama-32-3b"],
-    activeModel: "harness-llama-32-3b",
+    modelRefs: ["6c1a2b41161032677be168d354123594c0e6e67d2b9227c84f296ad037c728ff"],
+    activeModel: "6c1a2b41161032677be168d354123594c0e6e67d2b9227c84f296ad037c728ff",
   },
   {
     schema: 1,
@@ -221,7 +221,7 @@ function list(): WorkspaceList {
 let harnessLibrary: LibraryModel[] = [
   {
     schema: 1,
-    sha256: "harness-llama-32-3b",
+    sha256: "6c1a2b41161032677be168d354123594c0e6e67d2b9227c84f296ad037c728ff",
     fileName: "llama-3.2-3b-instruct-Q4_K_M.gguf",
     path: "X:/harness/models/llama-3.2-3b/llama-3.2-3b-instruct-Q4_K_M.gguf",
     sizeBytes: 2_019_377_000,
@@ -242,7 +242,7 @@ const harnessConvs: Conversation[] = [
     id: "harness-conv-1",
     workspaceId: "harness-1",
     title: "Shader compilation errors",
-    modelSha: "harness-llama-32-3b",
+    modelSha: "6c1a2b41161032677be168d354123594c0e6e67d2b9227c84f296ad037c728ff",
     createdAt: new Date(Date.now() - 86400000).toISOString(),
     updatedAt: new Date(Date.now() - 3600000 * 3).toISOString(),
     messages: [
@@ -255,7 +255,7 @@ const harnessConvs: Conversation[] = [
     id: "harness-conv-2",
     workspaceId: "harness-1",
     title: "Zebra migration patterns",
-    modelSha: "harness-llama-32-3b",
+    modelSha: "6c1a2b41161032677be168d354123594c0e6e67d2b9227c84f296ad037c728ff",
     createdAt: new Date(Date.now() - 86400000 * 2).toISOString(),
     updatedAt: new Date(Date.now() - 86400000).toISOString(),
     messages: [
@@ -268,7 +268,7 @@ const harnessConvs: Conversation[] = [
     id: "harness-conv-3",
     workspaceId: "harness-1",
     title: "Tilemap autoloading",
-    modelSha: "harness-llama-32-3b",
+    modelSha: "6c1a2b41161032677be168d354123594c0e6e67d2b9227c84f296ad037c728ff",
     createdAt: new Date(Date.now() - 86400000 * 3).toISOString(),
     updatedAt: new Date(Date.now() - 86400000 * 2).toISOString(),
     messages: [

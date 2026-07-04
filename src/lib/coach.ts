@@ -47,6 +47,22 @@ export const WALKTHROUGHS: Record<string, Walkthrough> = {
       },
     ],
   },
+  models: {
+    id: "models",
+    steps: [
+      {
+        title: "Every model, matched to your machine",
+        body: "The jewels beside each model show how well each version runs here — filled violet fits comfortably, amber is tight, dim won't fit. Click any row for the full breakdown.",
+        placement: "center",
+      },
+      {
+        target: "model-filters",
+        title: "Filter and sort to find yours",
+        body: "Narrow by what you need — coding, reasoning — and sort by capability, size, or name. Downloaded models show their size and can be deleted to reclaim disk.",
+        placement: "bottom",
+      },
+    ],
+  },
   conversations: {
     id: "conversations",
     steps: [

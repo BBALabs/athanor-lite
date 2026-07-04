@@ -8,7 +8,7 @@ import { useEffect, useMemo, useState, type MouseEvent } from "react";
 import { useStore } from "../state/store";
 import { ipc } from "../lib/ipc";
 import { bytesHuman, ctxHuman } from "../lib/format";
-import { CloseIcon } from "../components/Icons";
+import { CloseIcon, TrashIcon } from "../components/Icons";
 import type {
   CatalogEntry,
   DownloadProgress,
@@ -27,6 +27,14 @@ const FILTERS: { id: Filter; label: string }[] = [
   { id: "coding", label: "Coding" },
   { id: "reasoning", label: "Reasoning" },
   { id: "embedding", label: "Embedding" },
+];
+
+type SortMode = "quality" | "size" | "name";
+
+const SORTS: { id: SortMode; label: string }[] = [
+  { id: "quality", label: "Capability" },
+  { id: "size", label: "Size" },
+  { id: "name", label: "Name" },
 ];
 
 /** Fit verdicts come from the backend (one source of truth) via a lookup. */
@@ -77,6 +85,31 @@ function FitJewels({ entry, fitOf }: { entry: CatalogEntry; fitOf: FitLookup }) 
   );
 }
 
+/** A two-step delete for an installed model file — reclaims the disk. */
+function DeleteQuant({ sha }: { sha: string }) {
+  const deleteModel = useStore((s) => s.deleteModel);
+  const [armed, setArmed] = useState(false);
+  useEffect(() => {
+    if (!armed) return;
+    const t = setTimeout(() => setArmed(false), 3500);
+    return () => clearTimeout(t);
+  }, [armed]);
+  return (
+    <button
+      className={`quant-action__delete${armed ? " quant-action__delete--armed" : ""}`}
+      onClick={(e) => {
+        e.stopPropagation();
+        if (armed) void deleteModel(sha);
+        else setArmed(true);
+      }}
+      aria-label={armed ? "Confirm delete from disk" : "Delete from disk"}
+      title={armed ? "Click again to delete" : "Delete from disk"}
+    >
+      {armed ? "delete?" : <TrashIcon size={12} />}
+    </button>
+  );
+}
+
 /** The action cell for one quant: get / progress / installed. */
 function QuantAction({ entry, quant, mode }: { entry: CatalogEntry; quant: QuantOption; mode: FitMode }) {
   const library = useStore((s) => s.library);
@@ -87,7 +120,8 @@ function QuantAction({ entry, quant, mode }: { entry: CatalogEntry; quant: Quant
   const sha = quant.files[0]?.sha256;
   if (!sha) return <span className="t-quiet">—</span>;
 
-  const installed = library.some((m) => m.sha256 === sha);
+  const libModel = library.find((m) => m.sha256 === sha);
+  const installed = !!libModel;
   const dl: DownloadProgress | undefined = downloads[sha];
   const active = dl && (dl.state === "starting" || dl.state === "downloading" || dl.state === "verifying");
 
@@ -97,7 +131,12 @@ function QuantAction({ entry, quant, mode }: { entry: CatalogEntry; quant: Quant
   };
 
   if (installed) {
-    return <span className="quant-action quant-action--installed t-quiet">on disk</span>;
+    return (
+      <span className="quant-action quant-action--installed">
+        <span className="t-quiet">on disk · {bytesHuman(libModel!.sizeBytes)}</span>
+        <DeleteQuant sha={sha} />
+      </span>
+    );
   }
   if (active) {
     const pct = dl.totalBytes ? (dl.receivedBytes / dl.totalBytes) * 100 : 0;
@@ -321,7 +360,14 @@ function OllamaImport() {
 export function Models() {
   const catalog = useStore((s) => s.catalog);
   const recs = useStore((s) => s.recommendations);
+  const library = useStore((s) => s.library);
+  const maybeStartCoach = useStore((s) => s.maybeStartCoach);
   const [filter, setFilter] = useState<Filter>("all");
+  const [sort, setSort] = useState<SortMode>("quality");
+
+  useEffect(() => {
+    maybeStartCoach("models");
+  }, [maybeStartCoach]);
 
   const { heroEntry, entries } = useMemo(() => {
     if (!catalog) return { heroEntry: null, entries: [] as CatalogEntry[] };
@@ -329,11 +375,24 @@ export function Models() {
       filter === "all"
         ? catalog.entries
         : catalog.entries.filter((e) => e.roles.includes(filter));
-    const sorted = [...list].sort((a, b) => b.quality - a.quality);
+    const cmp =
+      sort === "size"
+        ? (a: CatalogEntry, b: CatalogEntry) => b.paramsB - a.paramsB || b.quality - a.quality
+        : sort === "name"
+          ? (a: CatalogEntry, b: CatalogEntry) => a.name.localeCompare(b.name)
+          : (a: CatalogEntry, b: CatalogEntry) => b.quality - a.quality;
+    const sorted = [...list].sort(cmp);
+    // The recommended model always leads, regardless of sort.
     const heroId = recs?.best?.entryId;
     const heroEntry = sorted.find((e) => e.id === heroId) ?? null;
     return { heroEntry, entries: sorted.filter((e) => e.id !== heroEntry?.id) };
-  }, [catalog, filter, recs]);
+  }, [catalog, filter, sort, recs]);
+
+  // Total disk used by installed models — the real footprint, from the library.
+  const diskGb = useMemo(
+    () => library.reduce((sum, m) => sum + m.sizeBytes, 0) / 1e9,
+    [library],
+  );
 
   // Fit lookup from the backend's table — the same numbers everywhere.
   const fitMap = useMemo(() => {
@@ -375,9 +434,16 @@ export function Models() {
           {filter === "all"
             ? `${shownRunnable} of ${shown} run on this machine · ${budgetLine}`
             : `${shown} ${filter} model${shown === 1 ? "" : "s"} · ${shownRunnable} run on this machine`}
+          {library.length > 0 && (
+            <span className="models__disk tnum">
+              {" · "}
+              {diskGb.toFixed(1)} GB on disk across {library.length} model
+              {library.length === 1 ? "" : "s"}
+            </span>
+          )}
         </span>
         <OllamaImport />
-        <nav className="filters">
+        <nav className="filters" data-coach="model-filters">
           {FILTERS.map((f) => (
             <button
               key={f.id}
@@ -385,6 +451,17 @@ export function Models() {
               onClick={() => setFilter(f.id)}
             >
               {f.label}
+            </button>
+          ))}
+          <span className="filters__sep" aria-hidden="true" />
+          {SORTS.map((s) => (
+            <button
+              key={s.id}
+              className={`filters__btn filters__btn--sort${sort === s.id ? " filters__btn--active" : ""}`}
+              onClick={() => setSort(s.id)}
+              title={`Sort by ${s.label.toLowerCase()}`}
+            >
+              {s.label}
             </button>
           ))}
         </nav>
