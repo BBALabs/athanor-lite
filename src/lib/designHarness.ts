@@ -231,6 +231,18 @@ let harnessLibrary: LibraryModel[] = [
     source: "huggingface",
     addedAt: new Date(Date.now() - 86400000 * 3).toISOString(),
   },
+  {
+    schema: 1,
+    sha256: "harness-qwen-coder-7b",
+    fileName: "qwen2.5-coder-7b-instruct-Q4_K_M.gguf",
+    path: "X:/harness/models/qwen2.5-coder-7b/qwen2.5-coder-7b-instruct-Q4_K_M.gguf",
+    sizeBytes: 4_680_000_000,
+    displayName: "Qwen2.5 Coder 7B",
+    entryId: "qwen2.5-coder-7b",
+    quant: "Q4_K_M",
+    source: "huggingface",
+    addedAt: new Date(Date.now() - 86400000 * 2).toISOString(),
+  },
 ];
 const harnessTimers: Record<string, number> = {};
 let onProgress: ((p: DownloadProgress) => void) | null = null;
@@ -280,6 +292,10 @@ const harnessConvs: Conversation[] = [
 let onChatDeltaHandler: ((d: ChatDelta) => void) | null = null;
 let onChatDoneHandler: ((d: ChatDone) => void) | null = null;
 let onChatToolHandler: ((t: unknown) => void) | null = null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let onCompareDeltaHandler: ((d: any) => void) | null = null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let onCompareSideHandler: ((s: any) => void) | null = null;
 let onOpsHandler: ((ops: Operation[]) => void) | null = null;
 let harnessCoachSeen: string[] = [];
 let harnessAccent = "violet";
@@ -678,6 +694,24 @@ export const harnessIpc = {
       onChatToolHandler = null;
     };
   },
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  onCompareDelta: async (handler: (d: any) => void) => {
+    onCompareDeltaHandler = handler;
+    return () => { onCompareDeltaHandler = null; };
+  },
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  onCompareSide: async (handler: (s: any) => void) => {
+    onCompareSideHandler = handler;
+    return () => { onCompareSideHandler = null; };
+  },
+  compareModels: async (_ws: string, prompt: string, _ma: string, nameA: string, _mb: string, nameB: string) => {
+    const stats = (tps: number, ttft: number, pn: number) => ({ ttftMs: ttft, promptN: 20, predictedN: pn, promptPerSecond: 2200, predictedPerSecond: tps, contextUsed: 20 + pn, gpuActive: true, cancelled: false });
+    onCompareDeltaHandler?.({ side: "a", delta: "A concise, direct answer" });
+    onCompareSideHandler?.({ side: "a", modelName: nameA, content: `${nameA}: a concise, direct answer to "${prompt.slice(0, 40)}".`, stats: stats(214.6, 41, 30), error: null });
+    onCompareDeltaHandler?.({ side: "b", delta: "A more detailed take" });
+    onCompareSideHandler?.({ side: "b", modelName: nameB, content: `${nameB}: a more detailed take, with a short example and caveats.`, stats: stats(138.2, 72, 52), error: null });
+  },
+  cancelCompare: async () => {},
 
   listOperations: async () => harnessOps(),
   cancelOperation: async (id: string) => {

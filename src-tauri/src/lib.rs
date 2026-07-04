@@ -210,6 +210,31 @@ fn fork_conversation(
     chat::fork(&app, &workspace_id, &conversation_id, upto)
 }
 
+#[tauri::command]
+#[allow(clippy::too_many_arguments)]
+async fn compare_models(
+    app: tauri::AppHandle,
+    workspace_id: String,
+    prompt: String,
+    model_a: String,
+    name_a: String,
+    model_b: String,
+    name_b: String,
+) -> Result<()> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let llm = app.state::<Llm>();
+        let ops = app.state::<Ops>();
+        chat::compare(&app, &llm, &ops, &workspace_id, &prompt, &model_a, &name_a, &model_b, &name_b)
+    })
+    .await
+    .map_err(|e| error::AthanorError::Chat(format!("compare task failed: {e}")))?
+}
+
+#[tauri::command]
+fn cancel_compare(ops: tauri::State<'_, Ops>) {
+    ops.request_cancel("compare");
+}
+
 // ── Operations registry surface ───────────────────────────────
 
 #[tauri::command]
@@ -1161,6 +1186,8 @@ pub fn run() {
             regenerate_reply,
             edit_and_resend,
             fork_conversation,
+            compare_models,
+            cancel_compare,
             stop_engine,
             get_metrics_settings,
             set_metrics_share,

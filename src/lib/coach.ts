@@ -97,6 +97,17 @@ export const WALKTHROUGHS: Record<string, Walkthrough> = {
       },
     ],
   },
+  compare: {
+    id: "compare",
+    steps: [
+      {
+        target: "compare",
+        title: "Test two models head-to-head",
+        body: "Pick two models, ask them the same thing, and read their answers side by side — with each one's real tokens/second. The fastest is flagged so you can choose with evidence.",
+        placement: "bottom",
+      },
+    ],
+  },
   benchmark: {
     id: "benchmark",
     steps: [

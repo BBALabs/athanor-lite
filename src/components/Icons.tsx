@@ -121,6 +121,16 @@ export function PlusIcon(props: IconProps) {
   );
 }
 
+/** Compare: two panels, side by side — A against B. */
+export function CompareIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M4.5 5.5h6v13h-6zM13.5 5.5h6v13h-6z" />
+      <path d="M12 3.5v17" strokeOpacity={0.5} />
+    </svg>
+  );
+}
+
 /** Tune: adjustment tracks with knobs — shaping a model to your data. */
 export function TuneIcon(props: IconProps) {
   return (

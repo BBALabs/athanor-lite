@@ -5,12 +5,13 @@
 
 import { useStore, type View } from "../state/store";
 import { monogram } from "../lib/format";
-import { ChatIcon, KnowledgeIcon, ModelsIcon, SettingsIcon, SpacesIcon, SystemIcon, TuneIcon } from "./Icons";
+import { ChatIcon, CompareIcon, KnowledgeIcon, ModelsIcon, SettingsIcon, SpacesIcon, SystemIcon, TuneIcon } from "./Icons";
 
 const SECTIONS: { view: View; label: string; icon: typeof SystemIcon }[] = [
   { view: "chat", label: "Chat", icon: ChatIcon },
   { view: "knowledge", label: "Knowledge", icon: KnowledgeIcon },
   { view: "models", label: "Models", icon: ModelsIcon },
+  { view: "compare", label: "Compare", icon: CompareIcon },
   { view: "training", label: "Tune", icon: TuneIcon },
   { view: "dashboard", label: "System", icon: SystemIcon },
   { view: "workspaces", label: "Workspaces", icon: SpacesIcon },

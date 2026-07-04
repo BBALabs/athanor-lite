@@ -13,6 +13,7 @@ import { Dashboard } from "./views/Dashboard";
 import { Models } from "./views/Models";
 import { Workspaces } from "./views/Workspaces";
 import { Training } from "./views/Training";
+import { Compare } from "./views/Compare";
 import { AlertIcon, CloseIcon } from "./components/Icons";
 import { monogram } from "./lib/format";
 import { ACCENT_PRESETS } from "./lib/theme";
@@ -147,6 +148,7 @@ export default function App() {
               {view === "knowledge" && <Knowledge />}
               {view === "dashboard" && <Dashboard />}
               {view === "models" && <Models />}
+              {view === "compare" && <Compare />}
               {view === "training" && <Training />}
               {view === "workspaces" && <Workspaces />}
             </>

@@ -654,14 +654,18 @@ pub fn fork(
     Ok(forked.id)
 }
 
-/// Run a single, unpersisted generation and return only its measured stats —
-/// no conversation, no events, capped output. The benchmark's building block.
-pub fn measure(
+/// Stream one completion for `messages` through the engine for `model_sha`,
+/// calling `on_delta` for each content chunk and returning the measured stats.
+/// The shared core of measure (benchmark) and compare — no conversation, no
+/// persistence, capped output.
+fn stream_completion(
     app: &AppHandle,
     llm: &Llm,
     model_sha: &str,
-    prompt: &str,
+    messages: serde_json::Value,
     max_tokens: u32,
+    cancel: &AtomicBool,
+    mut on_delta: impl FnMut(&str),
 ) -> Result<GenStats> {
     let port = server::ensure(app, llm, model_sha)?;
     let (api_key, gpu_active) = {
@@ -670,7 +674,7 @@ pub fn measure(
         (active.api_key.clone(), active.gpu_active.load(Ordering::Relaxed))
     };
     let body = serde_json::json!({
-        "messages": [{ "role": "user", "content": prompt }],
+        "messages": messages,
         "stream": true,
         "cache_prompt": false,
         "max_tokens": max_tokens,
@@ -685,7 +689,7 @@ pub fn measure(
         .bearer_auth(&api_key)
         .json(&body)
         .send()
-        .map_err(|e| AthanorError::Chat(format!("benchmark request failed: {e}")))?;
+        .map_err(|e| AthanorError::Chat(format!("request failed: {e}")))?;
     if !resp.status().is_success() {
         return Err(AthanorError::Chat(format!("engine returned HTTP {}", resp.status())));
     }
@@ -693,6 +697,9 @@ pub fn measure(
     let mut timings: Option<SseTimings> = None;
     let reader = BufReader::new(resp);
     for line in reader.lines() {
+        if cancel.load(Ordering::Relaxed) {
+            break;
+        }
         let line = line.map_err(|e| AthanorError::Chat(format!("stream read failed: {e}")))?;
         let Some(payload) = line.strip_prefix("data: ") else { continue };
         if payload.trim() == "[DONE]" {
@@ -703,8 +710,11 @@ pub fn measure(
             timings = Some(t);
         }
         if let Some(d) = chunk.choices.first().and_then(|c| c.delta.content.as_ref()) {
-            if !d.is_empty() && ttft_ms.is_none() {
-                ttft_ms = Some(started.elapsed().as_millis() as u64);
+            if !d.is_empty() {
+                if ttft_ms.is_none() {
+                    ttft_ms = Some(started.elapsed().as_millis() as u64);
+                }
+                on_delta(d);
             }
         }
     }
@@ -717,8 +727,128 @@ pub fn measure(
         predicted_per_second: t.predicted_per_second,
         context_used: t.cache_n + t.prompt_n + t.predicted_n,
         gpu_active,
-        cancelled: false,
+        cancelled: cancel.load(Ordering::Relaxed),
     })
+}
+
+/// Run a single, unpersisted generation and return only its measured stats —
+/// the benchmark's building block.
+pub fn measure(
+    app: &AppHandle,
+    llm: &Llm,
+    model_sha: &str,
+    prompt: &str,
+    max_tokens: u32,
+) -> Result<GenStats> {
+    let never = AtomicBool::new(false);
+    stream_completion(
+        app,
+        llm,
+        model_sha,
+        serde_json::json!([{ "role": "user", "content": prompt }]),
+        max_tokens,
+        &never,
+        |_| {},
+    )
+}
+
+// ── Multi-model compare ───────────────────────────────────────
+
+pub const EVENT_COMPARE_DELTA: &str = "compare://delta";
+pub const EVENT_COMPARE_SIDE: &str = "compare://side";
+const COMPARE_MAX_TOKENS: u32 = 512;
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CompareDelta {
+    side: String,
+    delta: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CompareSide {
+    side: String,
+    model_name: String,
+    content: String,
+    stats: Option<GenStats>,
+    error: Option<String>,
+}
+
+/// Run the same prompt through two models, one after the other, streaming each
+/// side's tokens and reporting per-side stats. Sequential (VRAM-friendly: only
+/// one model resident at a time) and registered as a cancellable operation.
+#[allow(clippy::too_many_arguments)]
+pub fn compare(
+    app: &AppHandle,
+    llm: &Llm,
+    ops: &Ops,
+    workspace_id: &str,
+    prompt: &str,
+    model_a: &str,
+    name_a: &str,
+    model_b: &str,
+    name_b: &str,
+) -> Result<()> {
+    let cancel = ops
+        .begin(app, "compare", OpKind::Generation, "Comparing models", true, None)
+        .ok_or_else(|| AthanorError::Chat("a comparison is already running".into()))?;
+
+    // Honor the workspace's system prompt / purpose, same as a normal chat.
+    let ws_list = workspaces::list(app)?;
+    let ws = ws_list.workspaces.iter().find(|w| w.id == workspace_id);
+    let system = ws.and_then(|w| {
+        w.system_prompt
+            .clone()
+            .filter(|s| !s.trim().is_empty())
+            .or_else(|| {
+                (!w.purpose.trim().is_empty())
+                    .then(|| format!("You are a focused assistant for this workspace. Its purpose: {}", w.purpose))
+            })
+    });
+
+    for (side, model_sha, model_name) in [("a", model_a, name_a), ("b", model_b, name_b)] {
+        if cancel.load(Ordering::Relaxed) {
+            break;
+        }
+        let mut messages = Vec::new();
+        if let Some(sys) = &system {
+            messages.push(serde_json::json!({ "role": "system", "content": sys }));
+        }
+        messages.push(serde_json::json!({ "role": "user", "content": prompt }));
+
+        let mut content = String::new();
+        let result = stream_completion(
+            app,
+            llm,
+            model_sha,
+            serde_json::Value::Array(messages),
+            COMPARE_MAX_TOKENS,
+            &cancel,
+            |d| {
+                content.push_str(d);
+                let _ = app.emit(
+                    EVENT_COMPARE_DELTA,
+                    &CompareDelta { side: side.into(), delta: d.into() },
+                );
+            },
+        );
+        let (stats, error) = match result {
+            Ok(s) => (Some(s), None),
+            Err(e) => (None, Some(e.to_string())),
+        };
+        let _ = app.emit(
+            EVENT_COMPARE_SIDE,
+            &CompareSide { side: side.into(), model_name: model_name.into(), content, stats, error },
+        );
+    }
+
+    if cancel.load(Ordering::Relaxed) {
+        ops.cancelled(app, "compare");
+    } else {
+        ops.done(app, "compare");
+    }
+    Ok(())
 }
 
 fn generate(app: &AppHandle, llm: &Llm, conv: &mut Conversation, cancel: &AtomicBool) -> Result<()> {

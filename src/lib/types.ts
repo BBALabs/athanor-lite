@@ -346,6 +346,19 @@ export interface ChatToolEvent {
   step: ToolStep;
 }
 
+export interface CompareDelta {
+  side: string;
+  delta: string;
+}
+
+export interface CompareSide {
+  side: string;
+  modelName: string;
+  content: string;
+  stats: GenStats | null;
+  error: string | null;
+}
+
 export interface McpTool {
   name: string;
   title: string | null;

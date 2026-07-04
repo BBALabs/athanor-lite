@@ -7,6 +7,7 @@ import {
   type Catalog,
   type Conversation,
   type ConversationMeta,
+  type GenStats,
   type DownloadProgress,
   type HardwareReport,
   type KnowledgeBase,
@@ -25,7 +26,7 @@ import {
   type WorkspaceList,
 } from "../lib/types";
 
-export type View = "chat" | "knowledge" | "dashboard" | "models" | "workspaces" | "training";
+export type View = "chat" | "knowledge" | "dashboard" | "models" | "workspaces" | "training" | "compare";
 
 const PENDING_CONV = "pending";
 export type BootPhase = "booting" | "ready" | "error";
@@ -92,6 +93,11 @@ interface AthanorStore {
   /** App-wide accent family id (persisted preference). */
   accent: string;
 
+  // Multi-model compare
+  compareRunning: boolean;
+  compareA: { name: string; text: string; stats: GenStats | null; error: string | null };
+  compareB: { name: string; text: string; stats: GenStats | null; error: string | null };
+
   setView: (v: View) => void;
   dismissOnboarding: () => void;
   setOpsOpen: (open: boolean) => void;
@@ -148,6 +154,10 @@ interface AthanorStore {
 
   // Preferences
   setAccent: (id: string) => Promise<void>;
+
+  // Compare
+  runCompare: (prompt: string, modelA: string, nameA: string, modelB: string, nameB: string) => Promise<void>;
+  cancelCompare: () => Promise<void>;
 }
 
 function errText(e: unknown): string {
@@ -198,6 +208,9 @@ export const useStore = create<AthanorStore>((set, get) => ({
   coachSeen: [],
   activeCoach: null,
   accent: "violet",
+  compareRunning: false,
+  compareA: { name: "", text: "", stats: null, error: null },
+  compareB: { name: "", text: "", stats: null, error: null },
 
   setView: (view) => set({ view }),
   dismissOnboarding: () => set({ onboardingNeeded: false }),
@@ -458,6 +471,18 @@ export const useStore = create<AthanorStore>((set, get) => ({
         // Append each autonomous tool call as it happens, in order.
         if (!get().generating) return;
         set((s) => ({ liveToolSteps: [...s.liveToolSteps, t.step] }));
+      });
+      await ipc.onCompareDelta((d) => {
+        set((s) =>
+          d.side === "a"
+            ? { compareA: { ...s.compareA, text: s.compareA.text + d.delta } }
+            : { compareB: { ...s.compareB, text: s.compareB.text + d.delta } },
+        );
+      });
+      await ipc.onCompareSide((side) => {
+        // Finalize one side with its full content + measured stats.
+        const pane = { name: side.modelName, text: side.content, stats: side.stats, error: side.error };
+        set(side.side === "a" ? { compareA: pane } : { compareB: pane });
       });
       await ipc.onRuntimeState((runtimeState) => set({ runtimeState }));
       await ipc.onServerStatus((serverStatus) => set({ serverStatus }));
@@ -973,6 +998,32 @@ export const useStore = create<AthanorStore>((set, get) => ({
     set({ accent: id });
     try {
       await ipc.setAccent(id);
+    } catch (e) {
+      set({ lastOpError: errText(e) });
+    }
+  },
+
+  runCompare: async (prompt, modelA, nameA, modelB, nameB) => {
+    const s = get();
+    const wsId = s.workspaces.activeId;
+    if (!wsId || s.compareRunning || !prompt.trim() || modelA === modelB) return;
+    set({
+      compareRunning: true,
+      compareA: { name: nameA, text: "", stats: null, error: null },
+      compareB: { name: nameB, text: "", stats: null, error: null },
+    });
+    try {
+      await ipc.compareModels(wsId, prompt, modelA, nameA, modelB, nameB);
+    } catch (e) {
+      set({ lastOpError: errText(e) });
+    } finally {
+      set({ compareRunning: false });
+    }
+  },
+
+  cancelCompare: async () => {
+    try {
+      await ipc.cancelCompare();
     } catch (e) {
       set({ lastOpError: errText(e) });
     }

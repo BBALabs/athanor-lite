@@ -17,6 +17,8 @@ import type {
   ChatRetrieval,
   ChatToolEvent,
   CoachState,
+  CompareDelta,
+  CompareSide,
   Conversation,
   CuratedPromptSet,
   DatasetMeta,
@@ -116,6 +118,20 @@ const tauriIpc = {
     invoke<string>("edit_and_resend", { workspaceId, conversationId, messageIndex, content }),
   forkConversation: (workspaceId: string, conversationId: string, upto: number) =>
     invoke<string>("fork_conversation", { workspaceId, conversationId, upto }),
+
+  compareModels: (
+    workspaceId: string,
+    prompt: string,
+    modelA: string,
+    nameA: string,
+    modelB: string,
+    nameB: string,
+  ) => invoke<void>("compare_models", { workspaceId, prompt, modelA, nameA, modelB, nameB }),
+  cancelCompare: () => invoke<void>("cancel_compare"),
+  onCompareDelta: (handler: (d: CompareDelta) => void): Promise<UnlistenFn> =>
+    listen<CompareDelta>("compare://delta", (e) => handler(e.payload)),
+  onCompareSide: (handler: (s: CompareSide) => void): Promise<UnlistenFn> =>
+    listen<CompareSide>("compare://side", (e) => handler(e.payload)),
 
   searchConversations: (workspaceId: string, query: string) =>
     invoke<SearchHit[]>("search_conversations", { workspaceId, query }),
