@@ -416,6 +416,34 @@ export interface Preferences {
   accent: string;
 }
 
+export type DatasetFormat = "chat" | "instruction" | "completion" | "unknown";
+
+export interface DatasetReport {
+  format: DatasetFormat;
+  totalLines: number;
+  valid: number;
+  invalid: number;
+  duplicates: number;
+  estTokens: number;
+  issues: string[];
+  preview: string[];
+}
+
+export interface DatasetMeta {
+  schema: number;
+  id: string;
+  name: string;
+  format: DatasetFormat;
+  examples: number;
+  estTokens: number;
+  createdAt: string;
+}
+
+export interface TrainerStatus {
+  available: boolean;
+  detail: string;
+}
+
 export interface MetricsRecord {
   schema: number;
   ts: string;

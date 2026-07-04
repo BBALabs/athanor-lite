@@ -2279,6 +2279,166 @@ textarea:focus-visible,
   background: var(--srf-1);
 }
 
+/* ── Tune — dataset studio ─────────────────────────────────── */
+
+.ds-studio,
+.ds-train {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-4);
+}
+
+.ds-error { color: var(--warn); }
+
+.ds-report {
+  padding: var(--sp-3);
+  border-radius: var(--r-srf);
+  background: var(--srf-1);
+  box-shadow: var(--catchlight);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.ds-report__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.ds-report__stats {
+  display: flex;
+  gap: var(--sp-4);
+  flex-wrap: wrap;
+}
+
+.ds-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ds-stat__n { font-size: 30px; }
+.ds-stat--warn .ds-stat__n { color: var(--warn); }
+
+.ds-report__issues {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 11.5px;
+  padding-left: 2px;
+}
+
+.ds-report__issues li { list-style: none; }
+.ds-report__issues li::before { content: "· "; color: var(--warn); }
+
+.ds-report__preview {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: var(--r-el);
+  background: rgba(0, 0, 0, 0.22);
+}
+
+.ds-preview { font-size: 11.5px; user-select: text; }
+
+.ds-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.ds-item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 11px 14px;
+  border-radius: var(--r-el);
+  cursor: pointer;
+  transition: background var(--t-hover) var(--glide);
+}
+
+.ds-item:hover { background: var(--srf-1); }
+.ds-item--sel { background: var(--srf-1); box-shadow: inset 2px 0 0 var(--lume); }
+.ds-item__name { color: var(--ink-hi); }
+
+.ds-item__del {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  color: var(--ink-low);
+  padding: 3px;
+  border-radius: 6px;
+  opacity: 0;
+  transition: color var(--t-hover) var(--glide), opacity var(--t-hover) var(--glide);
+}
+
+.ds-item:hover .ds-item__del { opacity: 1; }
+.ds-item__del:hover { color: var(--bad); background: var(--srf-2); }
+
+.ds-train__title { margin-bottom: 4px; }
+
+.ds-config {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--sp-2) var(--sp-3);
+}
+
+.ds-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ds-select {
+  padding: 9px 12px;
+  border-radius: var(--r-el);
+  background: var(--srf-1);
+  color: var(--ink-hi);
+  font-size: 12.5px;
+  box-shadow: var(--catchlight);
+  transition: box-shadow var(--t-hover) var(--glide);
+}
+
+.ds-select:focus { outline: none; box-shadow: var(--catchlight), inset 0 -1px 0 var(--lume); }
+
+.ds-field input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--srf-3);
+  cursor: pointer;
+}
+
+.ds-field input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, var(--lume-hot), var(--lume) 60%, var(--lume-deep));
+  box-shadow: 0 0 10px -1px rgba(160, 107, 255, 0.6);
+}
+
+/* The honest panel — informational quiet, a dim accent spine, no alarm. */
+.ds-trainer-status {
+  margin-top: var(--sp-2);
+  padding: 12px 14px;
+  border-radius: var(--r-el);
+  background: var(--srf-1);
+  box-shadow: inset 2px 0 0 var(--lume-deep);
+}
+
+.ds-trainer-status p { line-height: 1.6; max-width: 62ch; }
+
+.ds-train__start {
+  align-self: flex-start;
+  margin-top: var(--sp-2);
+}
+
 /* ── Degraded subsystem state ──────────────────────────────── */
 
 .degraded {

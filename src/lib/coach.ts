@@ -47,6 +47,29 @@ export const WALKTHROUGHS: Record<string, Walkthrough> = {
       },
     ],
   },
+  training: {
+    id: "training",
+    steps: [
+      {
+        title: "Fine-tune on your own data",
+        body: "Getting your data clean is the hard part — so start there. Drop a JSONL file and Athanor validates every example on your machine before saving it.",
+        placement: "center",
+      },
+      {
+        target: "ds-drop",
+        title: "Drop a training set",
+        body: "Chat turns, instruction/output, or prompt/completion — any of the common shapes. You'll see exactly what's valid, what was skipped, and roughly how many tokens it is.",
+        placement: "bottom",
+        advanceOnClick: true,
+      },
+      {
+        target: "ds-train",
+        title: "Set up the run",
+        body: "Pick a base model, a dataset, and the LoRA settings. The training run itself needs a runtime we don't bundle yet — we'll tell you straight, and your prepared data will be ready.",
+        placement: "top",
+      },
+    ],
+  },
   settings: {
     id: "settings",
     steps: [

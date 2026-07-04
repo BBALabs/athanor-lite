@@ -25,7 +25,7 @@ import {
   type WorkspaceList,
 } from "../lib/types";
 
-export type View = "chat" | "knowledge" | "dashboard" | "models" | "workspaces";
+export type View = "chat" | "knowledge" | "dashboard" | "models" | "workspaces" | "training";
 
 const PENDING_CONV = "pending";
 export type BootPhase = "booting" | "ready" | "error";

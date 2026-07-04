@@ -285,6 +285,23 @@ what was called, with what, and what came back. Verified end-to-end on-device: t
 model autonomously calls a sum tool with coerced arguments and folds the result into
 its answer.
 
+## 7d. Fine-tuning — the dataset studio
+
+Getting data into a clean, validated training set is where most people stall, so that is the
+part made real and trustworthy. The `training` module (pure, unit-tested `analyze()`) parses a
+JSONL file, **detects the format** (chat `messages[]`, Alpaca instruction/output, or
+prompt/completion), **validates every example** (required non-empty fields; chat needs an
+assistant turn), **dedupes** exact repeats, estimates tokens, and reports the first few concrete
+issues rather than a wall of noise. A usable set is saved as a **named, versioned artifact**
+under `workspaces/<id>/training/datasets/<id>/` (deduped `data.jsonl` + `meta.json`). The Tune
+view drives it: drop → report card (valid / skipped / duplicates / tokens) → save → list/delete,
+plus a config panel (base model, dataset, LoRA rank, epochs).
+
+**Honesty boundary:** the training *run* needs a LoRA runtime (PyTorch/Unsloth-class) that isn't
+bundled — especially on Windows + Blackwell. Rather than fake a progress bar, `trainer_status()`
+reports the truth, the Start button is disabled with that reason on screen, and the prepared
+datasets wait, ready, for when the runtime lands. Nothing the user does is wasted or pretended.
+
 ## 8. Reliability, security, logging
 
 - **Sandboxing:** Tauri capability system pinned to the minimum (window controls, events,

@@ -283,6 +283,8 @@ let onChatToolHandler: ((t: unknown) => void) | null = null;
 let onOpsHandler: ((ops: Operation[]) => void) | null = null;
 let harnessCoachSeen: string[] = [];
 let harnessAccent = "violet";
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let harnessDatasets: any[] = [];
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const harnessDocs: any[] = [
@@ -695,6 +697,33 @@ export const harnessIpc = {
   getDataRoot: async () => "C:\\Users\\you\\AppData\\Roaming\\com.bba.athanor",
   revealDataRoot: async () => {},
   isPortable: async () => false,
+  importDataset: async (_workspaceId: string, name: string) => {
+    const id = `ds-${Date.now()}`;
+    harnessDatasets = [
+      { schema: 1, id, name: name || "dataset", format: "instruction", examples: 412, estTokens: 58200, createdAt: new Date().toISOString() },
+      ...harnessDatasets,
+    ];
+    return {
+      format: "instruction",
+      totalLines: 420,
+      valid: 412,
+      invalid: 8,
+      duplicates: 4,
+      estTokens: 58200,
+      issues: ["line 17: not valid JSON (trailing comma)", "line 88: missing or empty required fields"],
+      preview: ["Sort a list of integers ascending — Use sorted(nums).", "Reverse a string — return s[::-1]."],
+    };
+  },
+  listDatasets: async () => [...harnessDatasets],
+  deleteDataset: async (_workspaceId: string, id: string) => {
+    harnessDatasets = harnessDatasets.filter((d) => d.id !== id);
+    return [...harnessDatasets];
+  },
+  getTrainerStatus: async () => ({
+    available: false,
+    detail:
+      "Local fine-tuning runs on a LoRA runtime that isn't bundled yet — PyTorch/Unsloth-class training on Windows + Blackwell is still bleeding-edge. Your prepared datasets are saved and ready for the moment it lands; nothing you do here is wasted.",
+  }),
   rotateApiKey: async () => ({
     expose: true,
     running: true,

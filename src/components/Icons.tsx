@@ -121,6 +121,17 @@ export function PlusIcon(props: IconProps) {
   );
 }
 
+/** Tune: adjustment tracks with knobs — shaping a model to your data. */
+export function TuneIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M4 8h9M19 8h1M4 16h1M11 16h9" />
+      <circle cx="16" cy="8" r="2.3" />
+      <circle cx="8" cy="16" r="2.3" />
+    </svg>
+  );
+}
+
 /** Search: a lens over the record. */
 export function SearchIcon(props: IconProps) {
   return (

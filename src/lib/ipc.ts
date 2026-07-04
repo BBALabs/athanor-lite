@@ -17,8 +17,11 @@ import type {
   ChatToolEvent,
   CoachState,
   Conversation,
+  DatasetMeta,
+  DatasetReport,
   Preferences,
   SearchHit,
+  TrainerStatus,
   ConversationMeta,
   KnowledgeBase,
   McpServerConfig,
@@ -142,6 +145,14 @@ const tauriIpc = {
   getDataRoot: () => invoke<string>("get_data_root"),
   revealDataRoot: () => invoke<void>("reveal_data_root"),
   isPortable: () => invoke<boolean>("is_portable"),
+
+  importDataset: (workspaceId: string, name: string, path: string) =>
+    invoke<DatasetReport>("import_dataset", { workspaceId, name, path }),
+  listDatasets: (workspaceId: string) =>
+    invoke<DatasetMeta[]>("list_datasets", { workspaceId }),
+  deleteDataset: (workspaceId: string, id: string) =>
+    invoke<DatasetMeta[]>("delete_dataset", { workspaceId, id }),
+  getTrainerStatus: () => invoke<TrainerStatus>("get_trainer_status"),
   rotateApiKey: () => invoke<ApiInfo>("rotate_api_key"),
   checkForUpdate: () =>
     invoke<{ currentVersion: string; available: string | null; note: string }>(

@@ -10,6 +10,7 @@ mod portable;
 mod preferences;
 mod rag;
 mod runtime;
+mod training;
 mod uistate;
 mod workspaces;
 
@@ -421,6 +422,39 @@ fn get_data_root(app: tauri::AppHandle) -> Result<String> {
 #[tauri::command]
 fn is_portable() -> bool {
     portable::is_portable()
+}
+
+// ── Fine-tuning: dataset studio ───────────────────────────────
+
+#[tauri::command]
+async fn import_dataset(
+    app: tauri::AppHandle,
+    workspace_id: String,
+    name: String,
+    path: String,
+) -> Result<training::DatasetReport> {
+    tauri::async_runtime::spawn_blocking(move || training::import(&app, &workspace_id, &name, &path))
+        .await
+        .map_err(|e| error::AthanorError::Workspace(format!("import task failed: {e}")))?
+}
+
+#[tauri::command]
+fn list_datasets(app: tauri::AppHandle, workspace_id: String) -> Result<Vec<training::DatasetMeta>> {
+    training::list(&app, &workspace_id)
+}
+
+#[tauri::command]
+fn delete_dataset(
+    app: tauri::AppHandle,
+    workspace_id: String,
+    id: String,
+) -> Result<Vec<training::DatasetMeta>> {
+    training::delete(&app, &workspace_id, &id)
+}
+
+#[tauri::command]
+fn get_trainer_status() -> training::TrainerStatus {
+    training::trainer_status()
 }
 
 /// Open the app's data folder in the OS file manager. Cross-platform.
@@ -998,6 +1032,10 @@ pub fn run() {
             get_data_root,
             reveal_data_root,
             is_portable,
+            import_dataset,
+            list_datasets,
+            delete_dataset,
+            get_trainer_status,
             rotate_api_key,
             check_for_update,
             list_operations,
