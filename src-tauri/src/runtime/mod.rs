@@ -34,6 +34,12 @@ pub const EVENT_STATE: &str = "runtime://state";
 /// CUDA 12.4 is chosen over 13.3 for architecture breadth (Pascal+).
 pub const LLAMA_TAG: &str = "b9867";
 
+/// The server binary's name — `.exe` on Windows, bare elsewhere.
+#[cfg(windows)]
+pub const LLAMA_BINARY: &str = "llama-server.exe";
+#[cfg(not(windows))]
+pub const LLAMA_BINARY: &str = "llama-server";
+
 struct RuntimeAsset {
     url: &'static str,
     /// Expected size from the release API — a sanity check, not a hash
@@ -122,30 +128,47 @@ pub fn runtime_dir(app: &AppHandle, backend: Backend) -> Result<PathBuf> {
 /// registry as a cancellable fetch.
 pub fn ensure_runtime(app: &AppHandle, backend: Backend) -> Result<PathBuf> {
     let dir = runtime_dir(app, backend)?;
-    let exe = dir.join("llama-server.exe");
+    let exe = dir.join(LLAMA_BINARY);
     if exe.exists() {
         return Ok(exe);
     }
 
-    let ops = app.state::<Ops>();
-    let cancel = ops
-        .begin(
-            app,
-            "engine-fetch",
-            OpKind::EngineFetch,
-            &format!("Inference engine {LLAMA_TAG}"),
-            true,
-            None,
-        )
-        .ok_or_else(|| AthanorError::Runtime("engine fetch already running".into()))?;
-
-    let result = fetch_runtime(app, backend, &dir, &cancel);
-    match &result {
-        Ok(_) => ops.done(app, "engine-fetch"),
-        Err(e) if e.to_string().contains("cancelled") => ops.cancelled(app, "engine-fetch"),
-        Err(e) => ops.failed(app, "engine-fetch", &e.to_string()),
+    // The prebuilt llama.cpp runtime we bundle is Windows-only today. The rest
+    // of the app (hardware, workspaces, RAG, settings, portable mode) is
+    // platform-neutral; this is the one honest boundary until macOS/Linux
+    // release assets are wired and verified on those platforms in CI. The two
+    // cfg blocks are mutually exclusive tail expressions — exactly one survives
+    // compilation and returns the function's value.
+    #[cfg(not(windows))]
+    {
+        Err(AthanorError::Runtime(format!(
+            "the managed inference engine is currently bundled for Windows only \
+             ({} support is in progress)",
+            std::env::consts::OS
+        )))
     }
-    result
+    #[cfg(windows)]
+    {
+        let ops = app.state::<Ops>();
+        let cancel = ops
+            .begin(
+                app,
+                "engine-fetch",
+                OpKind::EngineFetch,
+                &format!("Inference engine {LLAMA_TAG}"),
+                true,
+                None,
+            )
+            .ok_or_else(|| AthanorError::Runtime("engine fetch already running".into()))?;
+
+        let result = fetch_runtime(app, backend, &dir, &cancel);
+        match &result {
+            Ok(_) => ops.done(app, "engine-fetch"),
+            Err(e) if e.to_string().contains("cancelled") => ops.cancelled(app, "engine-fetch"),
+            Err(e) => ops.failed(app, "engine-fetch", &e.to_string()),
+        }
+        result
+    }
 }
 
 fn fetch_runtime(
@@ -243,11 +266,11 @@ fn fetch_runtime(
         state.phase = "downloading".into();
     }
 
-    if !staging.join("llama-server.exe").exists() {
+    if !staging.join(LLAMA_BINARY).exists() {
         let _ = fs::remove_dir_all(&staging);
-        return Err(AthanorError::Runtime(
-            "extracted runtime is missing llama-server.exe".into(),
-        ));
+        return Err(AthanorError::Runtime(format!(
+            "extracted runtime is missing {LLAMA_BINARY}"
+        )));
     }
 
     // Atomic-ish install: staging -> final. A crash leaves staging, retried next time.
@@ -261,5 +284,5 @@ fn fetch_runtime(
     state.detail = "engine installed".into();
     emit_state(app, &state);
     log::info!(target: "rt", "runtime {LLAMA_TAG} ({backend:?}) installed at {dir:?}");
-    Ok(dir.join("llama-server.exe"))
+    Ok(dir.join(LLAMA_BINARY))
 }

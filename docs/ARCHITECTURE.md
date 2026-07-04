@@ -296,6 +296,32 @@ its answer.
 - **Downloads (M2):** resumable, SHA256-verified against the catalog, pre-flighted against
   disk free space, content-addressed storage.
 
+## 8b. Cross-platform & portability
+
+The app is written to compile and run on Windows, macOS, and Linux; platform-specific code is
+isolated behind `#[cfg]` so no path is Windows-only by accident:
+
+- **Paths & data root:** everything derives from one `data_root()`; paths use `std::path`
+  (never hardcoded separators). Portable mode (§6) redirects the whole root to a folder beside
+  the executable — no registry, no user profile.
+- **Process lifetime:** the engine and MCP servers are bound to a Windows **Job Object**
+  (kill-on-crash). On Unix that binding is a no-op, and the cross-platform **orphan sweep** at
+  next launch is the safety net (it scans and kills any leftover engine by path).
+- **Child processes:** the server binary name is `#[cfg]`-selected (`llama-server.exe` vs
+  `llama-server`); `CREATE_NO_WINDOW` is Windows-only; MCP servers launch via `cmd /c` on
+  Windows (for `.cmd` shims) and directly on Unix.
+- **GPU detection:** NVML-first (Windows + Linux); WMI/registry supplementation is
+  Windows-gated; macOS has no NVIDIA path and degrades to CPU cleanly.
+- **Platform deps** (`windows`, `wmi`, `winreg`) are `[target.'cfg(windows)'.dependencies]`, so
+  they never break a Unix build.
+
+**Honest boundary:** the *prebuilt llama.cpp runtime* is bundled for Windows only today —
+`ensure_runtime` returns a clear "in progress" error on other platforms rather than fetching
+Windows binaries. The rest of the app (hardware, workspaces, RAG, MCP, settings, portable
+mode) is platform-neutral. **Windows is verified end-to-end on-device; macOS/Linux builds are
+correct-by-construction and pending verification in per-platform CI** — which, with real
+llama.cpp macOS-arm64 / Linux release assets wired into the asset table, closes the gap.
+
 ## 9. Milestones
 
 | | Scope | Status |
