@@ -760,6 +760,31 @@ export const harnessIpc = {
     ws.systemPrompt = prompt && prompt.trim() ? prompt : null;
     return ws;
   },
+  exportWorkspaceFilename: async (id: string) => {
+    const ws = workspaces.find((w) => w.id === id);
+    return `${(ws?.name ?? "workspace").replace(/[^\w -]/g, "_")}.athanor.json`;
+  },
+  exportWorkspace: async () => {},
+  importWorkspace: async () => {
+    const now = new Date().toISOString();
+    const ws: Workspace = {
+      schema: 1,
+      id: `harness-${Date.now()}`,
+      name: "Imported workspace",
+      purpose: "shared config",
+      accentHue: 205,
+      glyph: "I",
+      createdAt: now,
+      lastOpenedAt: now,
+      modelRefs: [],
+      activeModel: null,
+      templateId: null,
+      systemPrompt: "You are a senior software engineer.",
+    };
+    workspaces = [ws, ...workspaces];
+    activeId = ws.id;
+    return { workspace: ws, missingModel: { entryId: "qwen2.5-coder-7b", quant: "Q4_K_M", sha256: "abc", displayName: "Qwen2.5 Coder 7B" } };
+  },
   rotateApiKey: async () => ({
     expose: true,
     running: true,

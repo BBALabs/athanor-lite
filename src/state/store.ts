@@ -134,6 +134,7 @@ interface AthanorStore {
   }) => Promise<Workspace | null>;
   activateWorkspace: (id: string) => Promise<void>;
   deleteWorkspace: (id: string) => Promise<void>;
+  importWorkspaceFile: (path: string) => Promise<void>;
   clearOpError: () => void;
 
   // Coach
@@ -812,6 +813,21 @@ export const useStore = create<AthanorStore>((set, get) => ({
     try {
       const workspaces = await ipc.deleteWorkspace(id);
       set({ workspaces });
+    } catch (e) {
+      set({ lastOpError: errText(e) });
+    }
+  },
+
+  importWorkspaceFile: async (path) => {
+    try {
+      const res = await ipc.importWorkspace(path);
+      set({ workspaces: await ipc.listWorkspaces() });
+      await get().loadConversations();
+      if (res.missingModel) {
+        set({
+          lastOpError: `Imported “${res.workspace.name}”. It uses ${res.missingModel.displayName}, which isn't installed here — get it in Models to finish the setup.`,
+        });
+      }
     } catch (e) {
       set({ lastOpError: errText(e) });
     }

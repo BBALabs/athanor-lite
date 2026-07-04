@@ -5,10 +5,36 @@
  */
 
 import { useEffect, useState, type FormEvent } from "react";
+import { save, open } from "@tauri-apps/plugin-dialog";
 import { useStore } from "../state/store";
-import { PlusIcon, TrashIcon } from "../components/Icons";
+import { ipc } from "../lib/ipc";
+import { IN_TAURI } from "../lib/tauriEnv";
+import { PlusIcon, TrashIcon, ExportIcon } from "../components/Icons";
 import { monogram, relativeTime } from "../lib/format";
 import type { Template, Workspace } from "../lib/types";
+
+/** Export a workspace's shareable config to a file the user chooses. */
+function ShareControl({ ws }: { ws: Workspace }) {
+  return (
+    <button
+      className="ws-share"
+      onClick={async (e) => {
+        e.stopPropagation();
+        if (!IN_TAURI) return;
+        const name = await ipc.exportWorkspaceFilename(ws.id).catch(() => "workspace.athanor.json");
+        const dest = await save({
+          defaultPath: name,
+          filters: [{ name: "Athanor workspace", extensions: ["json"] }],
+        });
+        if (dest) void ipc.exportWorkspace(ws.id, dest);
+      }}
+      aria-label={`Export ${ws.name}`}
+      title="Export this workspace's config to share"
+    >
+      <ExportIcon size={13} />
+    </button>
+  );
+}
 
 /** Curated accent hues — light, never paint. */
 const ACCENTS = [275, 300, 205, 160, 25, 345];
@@ -197,8 +223,15 @@ function CreateSheet({ onDone }: { onDone: () => void }) {
 export function Workspaces() {
   const { workspaces, activeId } = useStore((s) => s.workspaces);
   const activate = useStore((s) => s.activateWorkspace);
+  const importWorkspaceFile = useStore((s) => s.importWorkspaceFile);
   const maybeStartCoach = useStore((s) => s.maybeStartCoach);
   const [creating, setCreating] = useState(false);
+
+  const doImport = async () => {
+    if (!IN_TAURI) return;
+    const picked = await open({ multiple: false, filters: [{ name: "Athanor workspace", extensions: ["json"] }] });
+    if (typeof picked === "string") void importWorkspaceFile(picked);
+  };
 
   const active = workspaces.find((w) => w.id === activeId) ?? null;
   const shelf = workspaces.filter((w) => w.id !== active?.id);
@@ -217,14 +250,17 @@ export function Workspaces() {
             ? "none yet"
             : `${workspaces.length} workspace${workspaces.length === 1 ? "" : "s"}`}
         </span>
-        <button
-          className="btn-quiet view-head__action"
-          onClick={() => setCreating(true)}
-          data-coach="new-workspace"
-        >
-          <PlusIcon size={13} />
-          New workspace
-        </button>
+        <div className="view-head__action garage__head-actions">
+          {IN_TAURI && (
+            <button className="btn-quiet" onClick={() => void doImport()} title="Import a shared workspace file">
+              Import
+            </button>
+          )}
+          <button className="btn-quiet" onClick={() => setCreating(true)} data-coach="new-workspace">
+            <PlusIcon size={13} />
+            New workspace
+          </button>
+        </div>
       </header>
 
       {active ? (
@@ -239,7 +275,10 @@ export function Workspaces() {
             {active.purpose && <div className="t-quiet garage__hero-purpose">{active.purpose}</div>}
             <div className="t-quiet garage__hero-meta">opened {relativeTime(active.lastOpenedAt)}</div>
           </div>
-          <DeleteControl ws={active} />
+          <div className="garage__hero-controls">
+            <ShareControl ws={active} />
+            <DeleteControl ws={active} />
+          </div>
         </section>
       ) : (
         <section className="garage__empty" onClick={() => setCreating(true)}>
@@ -269,7 +308,10 @@ export function Workspaces() {
                   {ws.purpose || `opened ${relativeTime(ws.lastOpenedAt)}`}
                 </span>
               </span>
-              <DeleteControl ws={ws} />
+              <div className="bay__controls">
+                <ShareControl ws={ws} />
+                <DeleteControl ws={ws} />
+              </div>
             </button>
           ))}
         </section>

@@ -1064,10 +1064,32 @@
 
 .garage__hero-purpose { max-width: 480px; }
 
-.garage__hero .ws-delete {
+.garage__hero-controls {
   position: absolute;
   top: var(--sp-3);
   right: var(--sp-3);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Share/export control — quiet, lights on hover. */
+.ws-share {
+  display: grid;
+  place-items: center;
+  padding: 6px;
+  border-radius: var(--r-el);
+  color: var(--ink-low);
+  transition: color var(--t-hover) var(--glide), background var(--t-hover) var(--glide),
+    opacity var(--t-hover) var(--glide);
+}
+
+.ws-share:hover { color: var(--lume-warm); background: var(--srf-2); }
+
+.garage__head-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
 }
 
 .garage__empty {
@@ -1144,14 +1166,18 @@
   text-overflow: ellipsis;
 }
 
-.bay .ws-delete {
+.bay__controls {
   position: absolute;
   top: 10px;
   right: 10px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
   opacity: 0;
+  transition: opacity var(--t-hover) var(--glide);
 }
 
-.bay:hover .ws-delete { opacity: 1; }
+.bay:hover .bay__controls { opacity: 1; }
 
 .ws-delete {
   display: grid;

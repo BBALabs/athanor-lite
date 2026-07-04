@@ -266,6 +266,19 @@ export interface WorkspaceList {
   damaged: string[];
 }
 
+export interface ModelRef {
+  entryId: string | null;
+  quant: string | null;
+  sha256: string;
+  displayName: string;
+}
+
+export interface WorkspaceImportResult {
+  workspace: Workspace;
+  /** A model the imported workspace wants that isn't installed here. */
+  missingModel: ModelRef | null;
+}
+
 export interface GenStats {
   ttftMs: number;
   promptN: number;

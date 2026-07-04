@@ -10,6 +10,7 @@ mod portable;
 mod preferences;
 mod prompts;
 mod rag;
+mod share;
 mod runtime;
 mod training;
 mod uistate;
@@ -495,6 +496,29 @@ fn set_workspace_system_prompt(
 ) -> Result<Workspace> {
     let _guard = lock.acquire();
     workspaces::set_system_prompt(&app, &id, prompt)
+}
+
+// ── Workspace sharing ─────────────────────────────────────────
+
+#[tauri::command]
+fn export_workspace_filename(app: tauri::AppHandle, id: String) -> Result<String> {
+    let m = share::build_manifest(&app, &id)?;
+    Ok(share::export_filename(&m.name))
+}
+
+#[tauri::command]
+fn export_workspace(app: tauri::AppHandle, id: String, dest: String) -> Result<()> {
+    share::export(&app, &id, &dest)
+}
+
+#[tauri::command]
+fn import_workspace(
+    app: tauri::AppHandle,
+    lock: tauri::State<'_, WsLock>,
+    path: String,
+) -> Result<share::ImportResult> {
+    let _guard = lock.acquire();
+    share::import(&app, &path)
 }
 
 /// Open the app's data folder in the OS file manager. Cross-platform.
@@ -1081,6 +1105,9 @@ pub fn run() {
             save_user_prompt,
             delete_user_prompt,
             set_workspace_system_prompt,
+            export_workspace_filename,
+            export_workspace,
+            import_workspace,
             rotate_api_key,
             check_for_update,
             list_operations,

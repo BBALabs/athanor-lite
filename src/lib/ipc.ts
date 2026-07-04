@@ -43,6 +43,7 @@ import type {
   TelemetrySample,
   TemplateSet,
   Workspace,
+  WorkspaceImportResult,
   WorkspaceList,
 } from "./types";
 
@@ -163,6 +164,10 @@ const tauriIpc = {
   deleteUserPrompt: (id: string) => invoke<UserPrompt[]>("delete_user_prompt", { id }),
   setWorkspaceSystemPrompt: (id: string, prompt: string | null) =>
     invoke<Workspace>("set_workspace_system_prompt", { id, prompt }),
+
+  exportWorkspaceFilename: (id: string) => invoke<string>("export_workspace_filename", { id }),
+  exportWorkspace: (id: string, dest: string) => invoke<void>("export_workspace", { id, dest }),
+  importWorkspace: (path: string) => invoke<WorkspaceImportResult>("import_workspace", { path }),
   rotateApiKey: () => invoke<ApiInfo>("rotate_api_key"),
   checkForUpdate: () =>
     invoke<{ currentVersion: string; available: string | null; note: string }>(
