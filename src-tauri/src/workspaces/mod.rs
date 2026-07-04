@@ -66,6 +66,10 @@ pub struct Workspace {
     /// used to tailor first-run guidance.
     #[serde(default)]
     pub template_id: Option<String>,
+    /// A full system prompt that overrides the short `purpose` as the assistant's
+    /// standing instruction when set (from the prompt library or a template).
+    #[serde(default)]
+    pub system_prompt: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -262,6 +266,7 @@ pub fn create(
         model_refs: Vec::new(),
         active_model: None,
         template_id,
+        system_prompt: None,
     };
 
     let dir = workspace_dir(app, &ws.id)?;
@@ -298,6 +303,18 @@ pub fn set_active_model(app: &AppHandle, id: &str, sha256: Option<String>) -> Re
     let mut ws = read_manifest(&dir)
         .map_err(|_| AthanorError::Workspace(format!("workspace {id} not found")))?;
     ws.active_model = sha256;
+    write_manifest(&dir, &ws)?;
+    Ok(ws)
+}
+
+/// Set (or clear, with None/empty) the standing system prompt for a workspace.
+pub fn set_system_prompt(app: &AppHandle, id: &str, prompt: Option<String>) -> Result<Workspace> {
+    let dir = workspace_dir(app, id)?;
+    let mut ws = read_manifest(&dir)
+        .map_err(|_| AthanorError::Workspace(format!("workspace {id} not found")))?;
+    ws.system_prompt = prompt
+        .map(|p| p.trim().chars().take(4000).collect::<String>())
+        .filter(|p| !p.is_empty());
     write_manifest(&dir, &ws)?;
     Ok(ws)
 }

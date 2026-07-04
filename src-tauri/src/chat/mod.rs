@@ -566,14 +566,15 @@ fn generate(app: &AppHandle, llm: &Llm, conv: &mut Conversation, cancel: &Atomic
     // Workspace purpose becomes the standing instruction — the whole point of
     // per-job workspaces.
     let ws_list = workspaces::list(app)?;
-    let purpose = ws_list
-        .workspaces
-        .iter()
-        .find(|w| w.id == conv.workspace_id)
-        .map(|w| w.purpose.clone())
-        .unwrap_or_default();
+    let ws = ws_list.workspaces.iter().find(|w| w.id == conv.workspace_id);
+    let purpose = ws.map(|w| w.purpose.clone()).unwrap_or_default();
+    let system_prompt = ws.and_then(|w| w.system_prompt.clone());
     let mut api_messages = Vec::new();
-    if !purpose.trim().is_empty() {
+    // A full system prompt from the prompt library wins; otherwise the short
+    // workspace purpose becomes the standing instruction.
+    if let Some(sp) = system_prompt.as_ref().filter(|s| !s.trim().is_empty()) {
+        api_messages.push(serde_json::json!({ "role": "system", "content": sp }));
+    } else if !purpose.trim().is_empty() {
         api_messages.push(serde_json::json!({
             "role": "system",
             "content": format!("You are a focused assistant for this workspace. Its purpose: {purpose}")

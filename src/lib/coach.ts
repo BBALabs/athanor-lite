@@ -97,6 +97,17 @@ export const WALKTHROUGHS: Record<string, Walkthrough> = {
       },
     ],
   },
+  prompts: {
+    id: "prompts",
+    steps: [
+      {
+        target: "prompt-lib",
+        title: "Give the assistant a persona",
+        body: "Pick a system prompt — Senior Engineer, Sharp Editor, Socratic Tutor — to shape how this workspace responds. Save your own, and switch any time. It applies to every conversation here.",
+        placement: "right",
+      },
+    ],
+  },
   conversations: {
     id: "conversations",
     steps: [

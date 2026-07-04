@@ -8,6 +8,7 @@ mod models;
 mod ops;
 mod portable;
 mod preferences;
+mod prompts;
 mod rag;
 mod runtime;
 mod training;
@@ -455,6 +456,45 @@ fn delete_dataset(
 #[tauri::command]
 fn get_trainer_status() -> training::TrainerStatus {
     training::trainer_status()
+}
+
+// ── System prompt library ─────────────────────────────────────
+
+#[tauri::command]
+fn get_curated_prompts() -> Result<&'static prompts::CuratedSet> {
+    prompts::curated()
+}
+
+#[tauri::command]
+fn list_user_prompts(app: tauri::AppHandle) -> Result<Vec<prompts::UserPrompt>> {
+    prompts::list_user(&app)
+}
+
+#[tauri::command]
+fn save_user_prompt(
+    app: tauri::AppHandle,
+    id: Option<String>,
+    title: String,
+    category: String,
+    body: String,
+) -> Result<Vec<prompts::UserPrompt>> {
+    prompts::save_user(&app, id, &title, &category, &body)
+}
+
+#[tauri::command]
+fn delete_user_prompt(app: tauri::AppHandle, id: String) -> Result<Vec<prompts::UserPrompt>> {
+    prompts::delete_user(&app, &id)
+}
+
+#[tauri::command]
+fn set_workspace_system_prompt(
+    app: tauri::AppHandle,
+    lock: tauri::State<'_, WsLock>,
+    id: String,
+    prompt: Option<String>,
+) -> Result<Workspace> {
+    let _guard = lock.acquire();
+    workspaces::set_system_prompt(&app, &id, prompt)
 }
 
 /// Open the app's data folder in the OS file manager. Cross-platform.
@@ -1036,6 +1076,11 @@ pub fn run() {
             list_datasets,
             delete_dataset,
             get_trainer_status,
+            get_curated_prompts,
+            list_user_prompts,
+            save_user_prompt,
+            delete_user_prompt,
+            set_workspace_system_prompt,
             rotate_api_key,
             check_for_update,
             list_operations,

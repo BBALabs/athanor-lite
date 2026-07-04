@@ -285,6 +285,8 @@ let harnessCoachSeen: string[] = [];
 let harnessAccent = "violet";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let harnessDatasets: any[] = [];
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let harnessUserPrompts: any[] = [];
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const harnessDocs: any[] = [
@@ -724,6 +726,40 @@ export const harnessIpc = {
     detail:
       "Local fine-tuning runs on a LoRA runtime that isn't bundled yet — PyTorch/Unsloth-class training on Windows + Blackwell is still bleeding-edge. Your prepared datasets are saved and ready for the moment it lands; nothing you do here is wasted.",
   }),
+  getCuratedPrompts: async () => ({
+    version: "1",
+    prompts: [
+      { id: "senior-engineer", title: "Senior Engineer", category: "Coding", body: "You are a senior software engineer. Write correct, idiomatic, well-tested code and explain your reasoning." },
+      { id: "code-reviewer", title: "Code Reviewer", category: "Coding", body: "You are a meticulous code reviewer. Report concrete defects ranked by severity; don't restate what the code does." },
+      { id: "editor", title: "Sharp Editor", category: "Writing", body: "You are a sharp line editor. Tighten prose without changing the author's voice. Offer specific rewrites, not praise." },
+      { id: "socratic-tutor", title: "Socratic Tutor", category: "Learning", body: "You teach by guiding. Explain one idea at a time, check understanding, and build from what the learner knows." },
+      { id: "researcher", title: "Research Analyst", category: "Research", body: "You investigate and synthesize. Separate established from speculative, cite sources, and state your confidence." },
+      { id: "concise", title: "Concise & Direct", category: "Productivity", body: "Be concise and direct. Answer first, justify only if it adds value. No preamble, no filler." },
+    ],
+  }),
+  listUserPrompts: async () => [...harnessUserPrompts],
+  saveUserPrompt: async (id: string | null, title: string, category: string, body: string) => {
+    if (id) {
+      const p = harnessUserPrompts.find((x) => x.id === id);
+      if (p) Object.assign(p, { title, category, body });
+    } else {
+      harnessUserPrompts = [
+        { id: `up-${Date.now()}`, title, category, body, createdAt: new Date().toISOString() },
+        ...harnessUserPrompts,
+      ];
+    }
+    return [...harnessUserPrompts];
+  },
+  deleteUserPrompt: async (id: string) => {
+    harnessUserPrompts = harnessUserPrompts.filter((p) => p.id !== id);
+    return [...harnessUserPrompts];
+  },
+  setWorkspaceSystemPrompt: async (id: string, prompt: string | null) => {
+    const ws = workspaces.find((w) => w.id === id);
+    if (!ws) throw { code: "WORKSPACE", message: "not found" };
+    ws.systemPrompt = prompt && prompt.trim() ? prompt : null;
+    return ws;
+  },
   rotateApiKey: async () => ({
     expose: true,
     running: true,

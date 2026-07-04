@@ -17,11 +17,13 @@ import type {
   ChatToolEvent,
   CoachState,
   Conversation,
+  CuratedPromptSet,
   DatasetMeta,
   DatasetReport,
   Preferences,
   SearchHit,
   TrainerStatus,
+  UserPrompt,
   ConversationMeta,
   KnowledgeBase,
   McpServerConfig,
@@ -153,6 +155,14 @@ const tauriIpc = {
   deleteDataset: (workspaceId: string, id: string) =>
     invoke<DatasetMeta[]>("delete_dataset", { workspaceId, id }),
   getTrainerStatus: () => invoke<TrainerStatus>("get_trainer_status"),
+
+  getCuratedPrompts: () => invoke<CuratedPromptSet>("get_curated_prompts"),
+  listUserPrompts: () => invoke<UserPrompt[]>("list_user_prompts"),
+  saveUserPrompt: (id: string | null, title: string, category: string, body: string) =>
+    invoke<UserPrompt[]>("save_user_prompt", { id, title, category, body }),
+  deleteUserPrompt: (id: string) => invoke<UserPrompt[]>("delete_user_prompt", { id }),
+  setWorkspaceSystemPrompt: (id: string, prompt: string | null) =>
+    invoke<Workspace>("set_workspace_system_prompt", { id, prompt }),
   rotateApiKey: () => invoke<ApiInfo>("rotate_api_key"),
   checkForUpdate: () =>
     invoke<{ currentVersion: string; available: string | null; note: string }>(

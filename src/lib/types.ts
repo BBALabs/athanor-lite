@@ -217,6 +217,28 @@ export interface Workspace {
   activeModel: string | null;
   /** The template this workspace was created from, if any. */
   templateId?: string | null;
+  /** A full system prompt overriding `purpose` as the standing instruction. */
+  systemPrompt?: string | null;
+}
+
+export interface Prompt {
+  id: string;
+  title: string;
+  category: string;
+  body: string;
+}
+
+export interface CuratedPromptSet {
+  version: string;
+  prompts: Prompt[];
+}
+
+export interface UserPrompt {
+  id: string;
+  title: string;
+  category: string;
+  body: string;
+  createdAt: string;
 }
 
 /** An opinionated starting point for a new workspace. */

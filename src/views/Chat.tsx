@@ -10,6 +10,7 @@ import { useStore } from "../state/store";
 import { IN_TAURI } from "../lib/tauriEnv";
 import { Markdown } from "../components/Markdown";
 import { PlusIcon, TrashIcon, SearchIcon, ExportIcon, CloseIcon } from "../components/Icons";
+import { PromptLibrary } from "../components/PromptLibrary";
 import { bytesHuman, monogram, relativeTime } from "../lib/format";
 import { KnowledgeIcon } from "../components/Icons";
 import type {
@@ -355,8 +356,10 @@ export function Chat() {
   const runSearch = useStore((s) => s.searchConversations);
   const clearSearch = useStore((s) => s.clearSearch);
   const maybeStartCoach = useStore((s) => s.maybeStartCoach);
+  const applySystemPrompt = useStore((s) => s.applySystemPrompt);
 
   const [draft, setDraft] = useState("");
+  const [showPrompts, setShowPrompts] = useState(false);
   const [query, setQuery] = useState("");
   const threadRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -390,6 +393,11 @@ export function Chat() {
   useEffect(() => {
     if (conversations.length >= 3) maybeStartCoach("conversations");
   }, [conversations.length, maybeStartCoach]);
+
+  // With a model in place, point out the prompt library (persona) control.
+  useEffect(() => {
+    if (ws?.activeModel) maybeStartCoach("prompts");
+  }, [ws?.activeModel, maybeStartCoach]);
 
   const openFromSearch = (id: string) => {
     setQuery("");
@@ -487,6 +495,15 @@ export function Chat() {
               ))
             )}
           </div>
+          <button
+            className={`sessions__persona${ws.systemPrompt ? " sessions__persona--on" : ""}`}
+            data-coach="prompt-lib"
+            onClick={() => setShowPrompts(true)}
+            title="Choose a system prompt"
+          >
+            <span className="sessions__persona-dot" />
+            {ws.systemPrompt ? "System prompt active" : "Prompt library"}
+          </button>
           {model && (
             <div className="sessions__model t-quiet" title={model.fileName}>
               {model.displayName}
@@ -563,6 +580,13 @@ export function Chat() {
           )}
         </section>
       </div>
+      {showPrompts && (
+        <PromptLibrary
+          active={ws.systemPrompt ?? null}
+          onApply={(body) => void applySystemPrompt(body && body.trim() ? body : null)}
+          onDone={() => setShowPrompts(false)}
+        />
+      )}
     </div>
   );
 }
