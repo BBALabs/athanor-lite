@@ -1,3 +1,4 @@
+mod benchmark;
 mod chat;
 mod downloads;
 mod error;
@@ -501,6 +502,28 @@ fn get_trainer_status() -> training::TrainerStatus {
     training::trainer_status()
 }
 
+// ── Speed benchmark ───────────────────────────────────────────
+
+#[tauri::command]
+async fn run_benchmark(
+    app: tauri::AppHandle,
+    model_sha: String,
+    model_name: String,
+) -> Result<benchmark::BenchResult> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let llm = app.state::<Llm>();
+        let ops = app.state::<Ops>();
+        benchmark::run(&app, &llm, &ops, &model_sha, &model_name)
+    })
+    .await
+    .map_err(|e| error::AthanorError::Chat(format!("benchmark task failed: {e}")))?
+}
+
+#[tauri::command]
+fn list_benchmarks(app: tauri::AppHandle) -> Result<Vec<benchmark::BenchResult>> {
+    benchmark::list(&app)
+}
+
 // ── System prompt library ─────────────────────────────────────
 
 #[tauri::command]
@@ -846,6 +869,23 @@ fn selftest_mcp(app: &tauri::AppHandle) -> Result<String> {
     ))
 }
 
+/// Benchmark self-test: run the real speed suite against the installed model
+/// and confirm it produces measured (non-zero) throughput on this hardware.
+#[cfg(debug_assertions)]
+fn selftest_benchmark(app: &tauri::AppHandle) -> Result<String> {
+    let model = downloads::ensure_installed(app, "llama-3.2-3b-instruct", "Q4_K_M")?;
+    let llm = app.state::<Llm>();
+    let ops = app.state::<Ops>();
+    let r = benchmark::run(app, &llm, &ops, &model.sha256, &model.display_name)?;
+    if r.gen_tps <= 0.0 || r.prompts == 0 {
+        return Err(error::AthanorError::Chat(format!("benchmark produced no throughput: {r:?}")));
+    }
+    Ok(format!(
+        "gen={:.1} tok/s · prompt={:.1} tok/s · ttft={} ms · gpu={} · prompts={}",
+        r.gen_tps, r.prompt_tps, r.ttft_ms, r.gpu_active, r.prompts
+    ))
+}
+
 /// Agentic self-test: connect a tool server, then ask the model to add two
 /// large numbers. Success requires the model to autonomously call the `add`
 /// tool AND fold its result into the final answer — proving the full loop
@@ -1055,6 +1095,7 @@ pub fn run() {
                             "rag" => selftest_rag(&handle),
                             "mcp" => selftest_mcp(&handle),
                             "agentic" => selftest_agentic(&handle),
+                            "benchmark" => selftest_benchmark(&handle),
                             "serve" => {
                                 // Bring the engine up and HOLD — used by the
                                 // orphan-guard test (hard-kill the app, then
@@ -1145,6 +1186,8 @@ pub fn run() {
             list_datasets,
             delete_dataset,
             get_trainer_status,
+            run_benchmark,
+            list_benchmarks,
             get_curated_prompts,
             list_user_prompts,
             save_user_prompt,

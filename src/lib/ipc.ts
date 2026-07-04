@@ -10,6 +10,7 @@ import { IN_TAURI } from "./tauriEnv";
 import { harnessIpc } from "./designHarness";
 import type {
   ApiInfo,
+  BenchResult,
   Catalog,
   ChatDelta,
   ChatDone,
@@ -163,6 +164,10 @@ const tauriIpc = {
   deleteDataset: (workspaceId: string, id: string) =>
     invoke<DatasetMeta[]>("delete_dataset", { workspaceId, id }),
   getTrainerStatus: () => invoke<TrainerStatus>("get_trainer_status"),
+
+  runBenchmark: (modelSha: string, modelName: string) =>
+    invoke<BenchResult>("run_benchmark", { modelSha, modelName }),
+  listBenchmarks: () => invoke<BenchResult[]>("list_benchmarks"),
 
   getCuratedPrompts: () => invoke<CuratedPromptSet>("get_curated_prompts"),
   listUserPrompts: () => invoke<UserPrompt[]>("list_user_prompts"),

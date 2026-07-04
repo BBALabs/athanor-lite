@@ -32,6 +32,7 @@ pub enum OpKind {
     Import,
     Index,
     Mcp,
+    Benchmark,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]

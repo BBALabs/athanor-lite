@@ -533,7 +533,20 @@ export type OpKind =
   | "generation"
   | "import"
   | "index"
-  | "mcp";
+  | "mcp"
+  | "benchmark";
+
+export interface BenchResult {
+  schema: number;
+  modelSha: string;
+  modelName: string;
+  ttftMs: number;
+  genTps: number;
+  promptTps: number;
+  gpuActive: boolean;
+  prompts: number;
+  ranAt: string;
+}
 export type OpState = "running" | "failed" | "cancelled";
 
 export interface Operation {

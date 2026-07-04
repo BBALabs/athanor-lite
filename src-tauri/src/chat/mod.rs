@@ -654,6 +654,73 @@ pub fn fork(
     Ok(forked.id)
 }
 
+/// Run a single, unpersisted generation and return only its measured stats —
+/// no conversation, no events, capped output. The benchmark's building block.
+pub fn measure(
+    app: &AppHandle,
+    llm: &Llm,
+    model_sha: &str,
+    prompt: &str,
+    max_tokens: u32,
+) -> Result<GenStats> {
+    let port = server::ensure(app, llm, model_sha)?;
+    let (api_key, gpu_active) = {
+        let guard = llm.lock();
+        let active = guard.as_ref().ok_or_else(|| AthanorError::Chat("engine stopped".into()))?;
+        (active.api_key.clone(), active.gpu_active.load(Ordering::Relaxed))
+    };
+    let body = serde_json::json!({
+        "messages": [{ "role": "user", "content": prompt }],
+        "stream": true,
+        "cache_prompt": false,
+        "max_tokens": max_tokens,
+    });
+    let client = reqwest::blocking::Client::builder()
+        .timeout(None)
+        .build()
+        .map_err(|e| AthanorError::Chat(e.to_string()))?;
+    let started = Instant::now();
+    let resp = client
+        .post(format!("http://127.0.0.1:{port}/v1/chat/completions"))
+        .bearer_auth(&api_key)
+        .json(&body)
+        .send()
+        .map_err(|e| AthanorError::Chat(format!("benchmark request failed: {e}")))?;
+    if !resp.status().is_success() {
+        return Err(AthanorError::Chat(format!("engine returned HTTP {}", resp.status())));
+    }
+    let mut ttft_ms: Option<u64> = None;
+    let mut timings: Option<SseTimings> = None;
+    let reader = BufReader::new(resp);
+    for line in reader.lines() {
+        let line = line.map_err(|e| AthanorError::Chat(format!("stream read failed: {e}")))?;
+        let Some(payload) = line.strip_prefix("data: ") else { continue };
+        if payload.trim() == "[DONE]" {
+            break;
+        }
+        let Ok(chunk) = serde_json::from_str::<SseDelta>(payload) else { continue };
+        if let Some(t) = chunk.timings {
+            timings = Some(t);
+        }
+        if let Some(d) = chunk.choices.first().and_then(|c| c.delta.content.as_ref()) {
+            if !d.is_empty() && ttft_ms.is_none() {
+                ttft_ms = Some(started.elapsed().as_millis() as u64);
+            }
+        }
+    }
+    let t = timings.ok_or_else(|| AthanorError::Chat("engine returned no timing data".into()))?;
+    Ok(GenStats {
+        ttft_ms: ttft_ms.unwrap_or(0),
+        prompt_n: t.prompt_n,
+        predicted_n: t.predicted_n,
+        prompt_per_second: t.prompt_per_second,
+        predicted_per_second: t.predicted_per_second,
+        context_used: t.cache_n + t.prompt_n + t.predicted_n,
+        gpu_active,
+        cancelled: false,
+    })
+}
+
 fn generate(app: &AppHandle, llm: &Llm, conv: &mut Conversation, cancel: &AtomicBool) -> Result<()> {
     let model_sha = conv.model_sha.clone().expect("set by caller");
     let port = server::ensure(app, llm, &model_sha)?;

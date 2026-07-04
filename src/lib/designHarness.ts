@@ -287,6 +287,10 @@ let harnessAccent = "violet";
 let harnessDatasets: any[] = [];
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let harnessUserPrompts: any[] = [];
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let harnessBenchmarks: any[] = [
+  { schema: 1, modelSha: "seed-a", modelName: "Qwen2.5 Coder 7B", ttftMs: 62, genTps: 138.2, promptTps: 2410, gpuActive: true, prompts: 4, ranAt: new Date(Date.now() - 86400000).toISOString() },
+];
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const harnessDocs: any[] = [
@@ -753,6 +757,12 @@ export const harnessIpc = {
     detail:
       "Local fine-tuning runs on a LoRA runtime that isn't bundled yet — PyTorch/Unsloth-class training on Windows + Blackwell is still bleeding-edge. Your prepared datasets are saved and ready for the moment it lands; nothing you do here is wasted.",
   }),
+  runBenchmark: async (modelSha: string, modelName: string) => {
+    const r = { schema: 1, modelSha, modelName, ttftMs: 41, genTps: 214.6, promptTps: 3120.4, gpuActive: true, prompts: 4, ranAt: new Date().toISOString() };
+    harnessBenchmarks = [r, ...harnessBenchmarks.filter((b) => b.modelSha !== modelSha)];
+    return r;
+  },
+  listBenchmarks: async () => [...harnessBenchmarks].sort((a, b) => b.genTps - a.genTps),
   getCuratedPrompts: async () => ({
     version: "1",
     prompts: [

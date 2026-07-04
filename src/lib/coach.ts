@@ -97,6 +97,17 @@ export const WALKTHROUGHS: Record<string, Walkthrough> = {
       },
     ],
   },
+  benchmark: {
+    id: "benchmark",
+    steps: [
+      {
+        target: "benchmark",
+        title: "Measure your models, for real",
+        body: "Run a short standard suite through any installed model and see its true tokens/second on this machine — no synthetic scores. Results rank here so you can pick the fastest for the job.",
+        placement: "top",
+      },
+    ],
+  },
   chatactions: {
     id: "chatactions",
     steps: [

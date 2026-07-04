@@ -6,7 +6,7 @@
 
 import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
 import { save } from "@tauri-apps/plugin-dialog";
-import { useStore } from "../state/store";
+import { useStore, useLatestSample } from "../state/store";
 import { IN_TAURI } from "../lib/tauriEnv";
 import { Markdown } from "../components/Markdown";
 import { PlusIcon, TrashIcon, SearchIcon, ExportIcon, CloseIcon } from "../components/Icons";
@@ -114,6 +114,65 @@ function RetrievalStrip({ sources }: { sources: Source[] }) {
     <div className="retrieval-strip t-quiet">
       <KnowledgeIcon size={13} />
       consulting {[...new Set(sources.map((s) => s.docName))].join(", ")}
+    </div>
+  );
+}
+
+const GIB = 1024 ** 3;
+
+/** Live inference HUD — real GPU/VRAM/temp from telemetry, plus an estimated
+ *  rate while tokens stream (the exact measured tok/s lands in the stats line). */
+function InferenceHUD() {
+  const generating = useStore((s) => s.generating);
+  const streamText = useStore((s) => s.streamText);
+  const sample = useLatestSample();
+  const startRef = useRef<number | null>(null);
+  const [, setTick] = useState(0);
+
+  useEffect(() => {
+    if (!generating) {
+      startRef.current = null;
+      return;
+    }
+    if (startRef.current == null) startRef.current = Date.now();
+    const t = window.setInterval(() => setTick((x) => x + 1), 250);
+    return () => window.clearInterval(t);
+  }, [generating]);
+
+  if (!generating) return null;
+  const elapsed = startRef.current ? (Date.now() - startRef.current) / 1000 : 0;
+  const words = streamText ? streamText.split(/\s+/).filter(Boolean).length : 0;
+  const tps = elapsed > 0.3 ? (words * 1.3) / elapsed : 0; // rough: ~1.3 tokens/word
+  const gpu = sample?.gpus[0];
+
+  return (
+    <div className="inf-hud">
+      <span className="inf-hud__cell">
+        <span className="inf-hud__n tnum">{tps.toFixed(0)}</span>
+        <span className="t-quiet"> ~tok/s</span>
+      </span>
+      {gpu && (
+        <span className="inf-hud__cell">
+          <span className="inf-hud__n tnum">{gpu.utilizationPct ?? 0}</span>
+          <span className="t-quiet">% GPU</span>
+        </span>
+      )}
+      {gpu && (
+        <span className="inf-hud__cell">
+          <span className="inf-hud__n tnum">{(gpu.vramUsedBytes / GIB).toFixed(1)}</span>
+          <span className="t-quiet"> GB VRAM</span>
+        </span>
+      )}
+      {gpu?.temperatureC != null && (
+        <span className="inf-hud__cell">
+          <span className="inf-hud__n tnum">{gpu.temperatureC}</span>
+          <span className="t-quiet">° C</span>
+        </span>
+      )}
+      <span className="inf-hud__cell">
+        <span className="inf-hud__n tnum">{elapsed.toFixed(1)}</span>
+        <span className="t-quiet"> s</span>
+      </span>
     </div>
   );
 }
@@ -638,6 +697,7 @@ export function Chat() {
               </div>
 
               <EngineStrip />
+              <InferenceHUD />
 
               <div className="composer">
                 <textarea

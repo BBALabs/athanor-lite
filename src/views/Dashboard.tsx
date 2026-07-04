@@ -4,10 +4,12 @@
  * per-role picks as a single quiet line. Eye flow: ring → model → band.
  */
 
+import { useEffect } from "react";
 import { useStore, useLatestSample } from "../state/store";
 import { PowerRing } from "../components/PowerRing";
 import { LightLine } from "../components/LightLine";
 import { Sparkline } from "../components/Sparkline";
+import { BenchmarkPanel } from "../components/BenchmarkPanel";
 import { useTweenedNumber } from "../lib/useTween";
 import { bytesHuman, COMPUTE_CLASS_LABEL, ghz, gib } from "../lib/format";
 
@@ -50,7 +52,14 @@ export function Dashboard() {
   const hw = useStore((s) => s.hardware);
   const recs = useStore((s) => s.recommendations);
   const telemetry = useStore((s) => s.telemetry);
+  const library = useStore((s) => s.library);
+  const maybeStartCoach = useStore((s) => s.maybeStartCoach);
   const sample = useLatestSample();
+
+  // With an installed model, point out the speed benchmark.
+  useEffect(() => {
+    if (library.length > 0) maybeStartCoach("benchmark");
+  }, [library.length, maybeStartCoach]);
 
   const liveGpu = sample?.gpus[0] ?? null;
   const primaryGpu = hw?.gpus[0] ?? null;
@@ -239,6 +248,9 @@ export function Dashboard() {
           ))}
         </section>
       )}
+
+      {/* ── Speed benchmark leaderboard ──────────────────── */}
+      <BenchmarkPanel />
     </div>
   );
 }

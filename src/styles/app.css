@@ -2679,6 +2679,101 @@ textarea:focus-visible,
   margin-top: var(--sp-2);
 }
 
+/* ── Speed benchmark leaderboard ───────────────────────────── */
+
+.bench {
+  margin-top: var(--sp-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.bench__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+}
+
+.bench__run {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+}
+
+.bench__select { max-width: 260px; }
+
+.bench__board {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Each model: name, a light bar (fraction of the fastest), the big number. */
+.bench__row {
+  display: grid;
+  grid-template-columns: minmax(140px, 1.4fr) minmax(80px, 2fr) auto;
+  grid-template-rows: auto auto;
+  align-items: center;
+  gap: 2px var(--sp-2);
+  padding: 10px 4px;
+}
+
+.bench__model { grid-column: 1; grid-row: 1; color: var(--ink-hi); }
+
+.bench__bar {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--srf-2);
+  overflow: hidden;
+}
+
+.bench__bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--lume-deep), var(--lume) 70%, var(--lume-warm));
+  box-shadow: 0 0 10px -2px rgba(160, 107, 255, 0.6);
+  transition: width var(--t-layout) var(--glide);
+}
+
+.bench__tps {
+  grid-column: 3;
+  grid-row: 1 / span 2;
+  justify-self: end;
+  font-size: 26px;
+}
+
+.bench__unit { font-size: 12px; }
+
+.bench__meta { grid-column: 1; grid-row: 2; font-size: 11px; }
+
+.bench__empty { padding: 4px; line-height: 1.6; }
+
+/* ── Live inference HUD ────────────────────────────────────── */
+
+.inf-hud {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-3);
+  padding: 8px 4px 2px;
+  animation: coachFade var(--t-layout) var(--glide) both;
+}
+
+.inf-hud__cell {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 2px;
+}
+
+.inf-hud__n {
+  font-family: var(--font-display);
+  font-size: 17px;
+  color: var(--lume-warm);
+}
+
 /* ── Degraded subsystem state ──────────────────────────────── */
 
 .degraded {

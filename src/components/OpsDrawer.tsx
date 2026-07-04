@@ -17,6 +17,7 @@ const KIND_LABEL: Record<Operation["kind"], string> = {
   import: "import",
   index: "indexing",
   mcp: "tool server",
+  benchmark: "benchmark",
 };
 
 function elapsed(startedAt: string): string {
