@@ -351,6 +351,20 @@ export interface ConversationMeta {
   messageCount: number;
 }
 
+export interface SearchMatch {
+  messageIndex: number;
+  role: string;
+  snippet: string;
+}
+
+export interface SearchHit {
+  id: string;
+  title: string;
+  updatedAt: string;
+  messageCount: number;
+  matches: SearchMatch[];
+}
+
 export interface ChatDelta {
   workspaceId: string;
   conversationId: string;

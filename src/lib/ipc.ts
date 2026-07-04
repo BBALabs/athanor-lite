@@ -17,6 +17,7 @@ import type {
   ChatToolEvent,
   CoachState,
   Conversation,
+  SearchHit,
   ConversationMeta,
   KnowledgeBase,
   McpServerConfig,
@@ -97,6 +98,19 @@ const tauriIpc = {
 
   deleteConversation: (workspaceId: string, conversationId: string) =>
     invoke<ConversationMeta[]>("delete_conversation", { workspaceId, conversationId }),
+
+  renameConversation: (workspaceId: string, conversationId: string, title: string) =>
+    invoke<ConversationMeta[]>("rename_conversation", { workspaceId, conversationId, title }),
+
+  searchConversations: (workspaceId: string, query: string) =>
+    invoke<SearchHit[]>("search_conversations", { workspaceId, query }),
+
+  exportConversation: (
+    workspaceId: string,
+    conversationId: string,
+    format: "markdown" | "json",
+    dest: string,
+  ) => invoke<void>("export_conversation", { workspaceId, conversationId, format, dest }),
 
   stopEngine: () => invoke<void>("stop_engine"),
 

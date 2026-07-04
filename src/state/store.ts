@@ -15,6 +15,7 @@ import {
   type RecommendationSet,
   type RuntimeState,
   type ServerStatus,
+  type SearchHit,
   type Source,
   type TelemetrySample,
   type Template,
@@ -60,6 +61,8 @@ interface AthanorStore {
 
   // Chat
   conversations: ConversationMeta[];
+  /** Live results for the sessions-rail search, or null when not searching. */
+  searchHits: SearchHit[] | null;
   activeConv: Conversation | null;
   /** Assistant text accumulating during a live generation. */
   streamText: string | null;
@@ -112,6 +115,10 @@ interface AthanorStore {
   sendMessage: (text: string) => Promise<void>;
   stopGeneration: () => Promise<void>;
   removeConversation: (id: string) => Promise<void>;
+  renameConversation: (id: string, title: string) => Promise<void>;
+  exportConversation: (id: string, format: "markdown" | "json", dest: string) => Promise<void>;
+  searchConversations: (query: string) => Promise<void>;
+  clearSearch: () => void;
   chooseWorkspaceModel: (sha256: string | null) => Promise<void>;
   createWorkspace: (args: {
     name: string;
@@ -163,6 +170,7 @@ export const useStore = create<AthanorStore>((set, get) => ({
   downloads: {},
   lastOpError: null,
   conversations: [],
+  searchHits: null,
   activeConv: null,
   streamText: null,
   generating: false,
@@ -644,6 +652,53 @@ export const useStore = create<AthanorStore>((set, get) => ({
       set({ lastOpError: errText(e) });
     }
   },
+
+  renameConversation: async (id, title) => {
+    const wsId = get().workspaces.activeId;
+    if (!wsId) return;
+    try {
+      const conversations = await ipc.renameConversation(wsId, id, title);
+      set((s) => ({
+        conversations,
+        activeConv:
+          s.activeConv?.id === id
+            ? { ...s.activeConv, title: title.trim().slice(0, 80) || "Untitled" }
+            : s.activeConv,
+      }));
+    } catch (e) {
+      set({ lastOpError: errText(e) });
+    }
+  },
+
+  exportConversation: async (id, format, dest) => {
+    const wsId = get().workspaces.activeId;
+    if (!wsId) return;
+    try {
+      await ipc.exportConversation(wsId, id, format, dest);
+    } catch (e) {
+      set({ lastOpError: errText(e) });
+    }
+  },
+
+  searchConversations: async (query) => {
+    const wsId = get().workspaces.activeId;
+    const q = query.trim();
+    if (!wsId || !q) {
+      set({ searchHits: null }); // empty query exits search mode
+      return;
+    }
+    // Enter search mode immediately (non-null) so results can render.
+    set((s) => ({ searchHits: s.searchHits ?? [] }));
+    try {
+      const hits = await ipc.searchConversations(wsId, q);
+      // Ignore a stale response if the box was cleared while it was in flight.
+      if (get().searchHits !== null) set({ searchHits: hits });
+    } catch (e) {
+      set({ lastOpError: errText(e), searchHits: [] });
+    }
+  },
+
+  clearSearch: () => set({ searchHits: null }),
 
   chooseWorkspaceModel: async (sha256) => {
     const wsId = get().workspaces.activeId;

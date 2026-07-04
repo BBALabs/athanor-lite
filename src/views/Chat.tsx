@@ -4,13 +4,22 @@
  * surfaces. Engine states narrate honestly: fetching, loading, ready.
  */
 
-import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
+import { save } from "@tauri-apps/plugin-dialog";
 import { useStore } from "../state/store";
+import { IN_TAURI } from "../lib/tauriEnv";
 import { Markdown } from "../components/Markdown";
-import { PlusIcon, TrashIcon } from "../components/Icons";
+import { PlusIcon, TrashIcon, SearchIcon, ExportIcon, CloseIcon } from "../components/Icons";
 import { bytesHuman, monogram, relativeTime } from "../lib/format";
 import { KnowledgeIcon } from "../components/Icons";
-import type { ChatMessage, LibraryModel, Source, ToolStep } from "../lib/types";
+import type {
+  ChatMessage,
+  ConversationMeta,
+  LibraryModel,
+  SearchHit,
+  Source,
+  ToolStep,
+} from "../lib/types";
 
 /** Pretty-print tool JSON args; fall back to the raw string if unparseable. */
 function fmtArgs(raw: string): string {
@@ -194,6 +203,140 @@ function ModelChooser() {
   );
 }
 
+/** A sanitized default filename for an exported conversation. */
+function exportName(title: string): string {
+  const clean = title.replace(/[^\w \-]+/g, "").trim().slice(0, 50);
+  return `${clean || "conversation"}.md`;
+}
+
+/** One session in the rail — open on click, rename on double-click, export/delete on hover. */
+function SessionRow({
+  c,
+  active,
+  onOpen,
+}: {
+  c: ConversationMeta;
+  active: boolean;
+  onOpen: () => void;
+}) {
+  const removeConversation = useStore((s) => s.removeConversation);
+  const renameConversation = useStore((s) => s.renameConversation);
+  const exportConversation = useStore((s) => s.exportConversation);
+  const [armedDelete, setArmedDelete] = useState(false);
+  const [renaming, setRenaming] = useState(false);
+  const [text, setText] = useState(c.title);
+
+  const doExport = async (e: MouseEvent) => {
+    e.stopPropagation();
+    if (!IN_TAURI) return;
+    const dest = await save({
+      defaultPath: exportName(c.title),
+      filters: [{ name: "Markdown", extensions: ["md"] }],
+    });
+    if (dest) void exportConversation(c.id, "markdown", dest);
+  };
+
+  const commitRename = () => {
+    setRenaming(false);
+    const t = text.trim();
+    if (t && t !== c.title) void renameConversation(c.id, t);
+  };
+
+  return (
+    <div
+      className={`session${active ? " session--active" : ""}`}
+      onClick={() => !renaming && onOpen()}
+      onMouseLeave={() => setArmedDelete(false)}
+    >
+      {renaming ? (
+        <input
+          className="session__rename"
+          value={text}
+          autoFocus
+          maxLength={80}
+          onClick={(e) => e.stopPropagation()}
+          onChange={(e) => setText(e.target.value)}
+          onBlur={commitRename}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              commitRename();
+            } else if (e.key === "Escape") {
+              setRenaming(false);
+              setText(c.title);
+            }
+          }}
+        />
+      ) : (
+        <span
+          className="session__title"
+          title="Double-click to rename"
+          onDoubleClick={(e) => {
+            e.stopPropagation();
+            setText(c.title);
+            setRenaming(true);
+          }}
+        >
+          {c.title}
+        </span>
+      )}
+      <span className="session__meta t-quiet">{relativeTime(c.updatedAt)}</span>
+      <div className="session__actions">
+        {IN_TAURI && (
+          <button
+            className="session__act"
+            onClick={doExport}
+            aria-label="Export conversation"
+            title="Export as Markdown"
+          >
+            <ExportIcon size={12} />
+          </button>
+        )}
+        <button
+          className={`ws-delete session__delete${armedDelete ? " ws-delete--armed" : ""}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            if (armedDelete) void removeConversation(c.id);
+            else setArmedDelete(true);
+          }}
+          aria-label={armedDelete ? "Confirm delete" : "Delete session"}
+        >
+          {armedDelete ? "sure?" : <TrashIcon size={12} />}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** Search results replace the session list while the search box has a query. */
+function SearchResults({
+  hits,
+  query,
+  onOpen,
+}: {
+  hits: SearchHit[];
+  query: string;
+  onOpen: (id: string) => void;
+}) {
+  if (hits.length === 0) {
+    return <div className="sessions__empty t-quiet">no matches for “{query}”</div>;
+  }
+  return (
+    <div className="search-results">
+      {hits.map((h) => (
+        <button key={h.id} className="search-hit" onClick={() => onOpen(h.id)}>
+          <span className="search-hit__title">{h.title}</span>
+          <span className="search-hit__meta t-quiet">
+            {relativeTime(h.updatedAt)}
+            {h.matches.length > 0 && ` · ${h.matches.length} match${h.matches.length === 1 ? "" : "es"}`}
+          </span>
+          {h.matches[0] && <span className="search-hit__snippet t-quiet">{h.matches[0].snippet}</span>}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export function Chat() {
   const { workspaces, activeId } = useStore((s) => s.workspaces);
   const conversations = useStore((s) => s.conversations);
@@ -207,11 +350,14 @@ export function Chat() {
   const stopGeneration = useStore((s) => s.stopGeneration);
   const openConversation = useStore((s) => s.openConversation);
   const newSession = useStore((s) => s.newSession);
-  const removeConversation = useStore((s) => s.removeConversation);
   const setView = useStore((s) => s.setView);
+  const searchHits = useStore((s) => s.searchHits);
+  const runSearch = useStore((s) => s.searchConversations);
+  const clearSearch = useStore((s) => s.clearSearch);
+  const maybeStartCoach = useStore((s) => s.maybeStartCoach);
 
   const [draft, setDraft] = useState("");
-  const [armedDelete, setArmedDelete] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
   const threadRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -222,6 +368,34 @@ export function Chat() {
     const el = threadRef.current;
     if (el) el.scrollTop = el.scrollHeight;
   }, [activeConv?.messages.length, streamText]);
+
+  // Debounced search — a big workspace shouldn't scan on every keystroke.
+  useEffect(() => {
+    const q = query.trim();
+    if (!q) {
+      clearSearch();
+      return;
+    }
+    const t = setTimeout(() => void runSearch(q), 180);
+    return () => clearTimeout(t);
+  }, [query, runSearch, clearSearch]);
+
+  // Clear the search when switching workspaces.
+  useEffect(() => {
+    setQuery("");
+    clearSearch();
+  }, [activeId, clearSearch]);
+
+  // Once a workspace has a little history, point out that it's all searchable.
+  useEffect(() => {
+    if (conversations.length >= 3) maybeStartCoach("conversations");
+  }, [conversations.length, maybeStartCoach]);
+
+  const openFromSearch = (id: string) => {
+    setQuery("");
+    clearSearch();
+    void openConversation(id);
+  };
 
   const submit = () => {
     const text = draft.trim();
@@ -277,31 +451,40 @@ export function Chat() {
               <PlusIcon size={14} />
             </button>
           </div>
-          <div className="sessions__list">
-            {conversations.map((c) => (
-              <div
-                key={c.id}
-                className={`session${activeConv?.id === c.id ? " session--active" : ""}`}
-                onClick={() => void openConversation(c.id)}
-                onMouseLeave={() => setArmedDelete(null)}
-              >
-                <span className="session__title">{c.title}</span>
-                <span className="session__meta t-quiet">{relativeTime(c.updatedAt)}</span>
+          {conversations.length > 0 && (
+            <div className="sessions__search" data-coach="conv-search">
+              <SearchIcon size={13} />
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search conversations…"
+                aria-label="Search conversations"
+              />
+              {query && (
                 <button
-                  className={`ws-delete session__delete${armedDelete === c.id ? " ws-delete--armed" : ""}`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (armedDelete === c.id) void removeConversation(c.id);
-                    else setArmedDelete(c.id);
-                  }}
-                  aria-label={armedDelete === c.id ? "Confirm delete" : "Delete session"}
+                  className="sessions__search-clear"
+                  onClick={() => setQuery("")}
+                  aria-label="Clear search"
                 >
-                  {armedDelete === c.id ? "sure?" : <TrashIcon size={12} />}
+                  <CloseIcon size={11} />
                 </button>
-              </div>
-            ))}
-            {conversations.length === 0 && (
+              )}
+            </div>
+          )}
+          <div className="sessions__list">
+            {searchHits !== null ? (
+              <SearchResults hits={searchHits} query={query.trim()} onOpen={openFromSearch} />
+            ) : conversations.length === 0 ? (
               <div className="sessions__empty t-quiet">no sessions yet</div>
+            ) : (
+              conversations.map((c) => (
+                <SessionRow
+                  key={c.id}
+                  c={c}
+                  active={activeConv?.id === c.id}
+                  onOpen={() => void openConversation(c.id)}
+                />
+              ))
             )}
           </div>
           {model && (

@@ -234,7 +234,49 @@ let harnessLibrary: LibraryModel[] = [
 ];
 const harnessTimers: Record<string, number> = {};
 let onProgress: ((p: DownloadProgress) => void) | null = null;
-const harnessConvs: Conversation[] = [];
+/* A few seeded sessions so the chat rail — history, search, rename — can be
+   designed in a browser without walking the (throttled) canned stream. */
+const harnessConvs: Conversation[] = [
+  {
+    schema: 1,
+    id: "harness-conv-1",
+    workspaceId: "harness-1",
+    title: "Shader compilation errors",
+    modelSha: "harness-llama-32-3b",
+    createdAt: new Date(Date.now() - 86400000).toISOString(),
+    updatedAt: new Date(Date.now() - 3600000 * 3).toISOString(),
+    messages: [
+      { role: "user", content: "Why does my Godot fragment shader fail with 'sampler2D expected'?", ts: new Date(Date.now() - 3600000 * 3).toISOString(), stats: null, sources: [], toolSteps: [] },
+      { role: "assistant", content: "That error means a uniform declared as `sampler2D` is being read like a plain value. Bind the texture and sample it with `texture(tex, UV)` instead.", ts: new Date(Date.now() - 3600000 * 3).toISOString(), stats: null, sources: [], toolSteps: [] },
+    ],
+  },
+  {
+    schema: 1,
+    id: "harness-conv-2",
+    workspaceId: "harness-1",
+    title: "Zebra migration patterns",
+    modelSha: "harness-llama-32-3b",
+    createdAt: new Date(Date.now() - 86400000 * 2).toISOString(),
+    updatedAt: new Date(Date.now() - 86400000).toISOString(),
+    messages: [
+      { role: "user", content: "Summarize zebra migration patterns across the Serengeti.", ts: new Date(Date.now() - 86400000).toISOString(), stats: null, sources: [], toolSteps: [] },
+      { role: "assistant", content: "Plains zebra follow the rains in a clockwise loop, tracking fresh grazing between the southern plains and the western corridor.", ts: new Date(Date.now() - 86400000).toISOString(), stats: null, sources: [], toolSteps: [] },
+    ],
+  },
+  {
+    schema: 1,
+    id: "harness-conv-3",
+    workspaceId: "harness-1",
+    title: "Tilemap autoloading",
+    modelSha: "harness-llama-32-3b",
+    createdAt: new Date(Date.now() - 86400000 * 3).toISOString(),
+    updatedAt: new Date(Date.now() - 86400000 * 2).toISOString(),
+    messages: [
+      { role: "user", content: "How do I autoload a tilemap resource in Godot 4?", ts: new Date(Date.now() - 86400000 * 2).toISOString(), stats: null, sources: [], toolSteps: [] },
+      { role: "assistant", content: "Register a script in Project Settings → Autoload, then `preload()` the .tres tilemap in its `_ready()`.", ts: new Date(Date.now() - 86400000 * 2).toISOString(), stats: null, sources: [], toolSteps: [] },
+    ],
+  },
+];
 let onChatDeltaHandler: ((d: ChatDelta) => void) | null = null;
 let onChatDoneHandler: ((d: ChatDone) => void) | null = null;
 let onChatToolHandler: ((t: unknown) => void) | null = null;
@@ -468,6 +510,30 @@ export const harnessIpc = {
     if (i >= 0) harnessConvs.splice(i, 1);
     return harnessIpc.listConversations(workspaceId);
   },
+  renameConversation: async (workspaceId: string, conversationId: string, title: string) => {
+    const c = harnessConvs.find((x) => x.id === conversationId);
+    if (c) c.title = title.trim().slice(0, 80) || "Untitled";
+    return harnessIpc.listConversations(workspaceId);
+  },
+  searchConversations: async (workspaceId: string, query: string) => {
+    const q = query.trim().toLowerCase();
+    if (!q) return [];
+    return harnessConvs
+      .filter((c) => c.workspaceId === workspaceId)
+      .map((c) => ({
+        id: c.id,
+        title: c.title,
+        updatedAt: c.updatedAt,
+        messageCount: c.messages.length,
+        matches: c.messages
+          .map((m, messageIndex) => ({ m, messageIndex }))
+          .filter(({ m }) => m.content.toLowerCase().includes(q))
+          .slice(0, 4)
+          .map(({ m, messageIndex }) => ({ messageIndex, role: m.role, snippet: m.content.slice(0, 90) })),
+      }))
+      .filter((h) => h.matches.length > 0 || h.title.toLowerCase().includes(q));
+  },
+  exportConversation: async () => {},
   stopEngine: async () => {},
   getMetricsSettings: async () => ({ schema: 1, share: false }),
   setMetricsShare: async (share: boolean) => ({ schema: 1, share }),

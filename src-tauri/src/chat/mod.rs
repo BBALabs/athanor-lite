@@ -209,6 +209,182 @@ pub fn delete(app: &AppHandle, workspace_id: &str, conv_id: &str) -> Result<Vec<
     list(app, workspace_id)
 }
 
+/// Give a conversation a name of the user's choosing (past the auto-title).
+pub fn rename(
+    app: &AppHandle,
+    workspace_id: &str,
+    conv_id: &str,
+    title: &str,
+) -> Result<Vec<ConversationMeta>> {
+    let mut conv = load(app, workspace_id, conv_id)?;
+    let t: String = title.trim().chars().take(80).collect();
+    conv.title = if t.is_empty() { "Untitled".into() } else { t };
+    save(app, &conv)?;
+    list(app, workspace_id)
+}
+
+// ── Search ────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SearchMatch {
+    pub message_index: usize,
+    pub role: String,
+    pub snippet: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SearchHit {
+    pub id: String,
+    pub title: String,
+    pub updated_at: String,
+    pub message_count: usize,
+    /// Up to a few matched messages, newest-relevant first.
+    pub matches: Vec<SearchMatch>,
+}
+
+const MAX_MATCHES_PER_CONV: usize = 4;
+
+/// A one-line preview centered on the first case-insensitive hit, whitespace
+/// collapsed. Char-based throughout, so it never splits a multibyte boundary.
+fn snippet(content: &str, needle_lower: &str) -> String {
+    const PAD: usize = 40;
+    let hay: Vec<char> = content.chars().collect();
+    let needle: Vec<char> = needle_lower.chars().collect();
+    let pos = if needle.is_empty() || needle.len() > hay.len() {
+        None
+    } else {
+        (0..=hay.len() - needle.len()).find(|&i| {
+            hay[i..i + needle.len()]
+                .iter()
+                .zip(&needle)
+                .all(|(c, n)| c.to_lowercase().next() == n.to_lowercase().next())
+        })
+    };
+    let (start, end) = match pos {
+        Some(p) => (p.saturating_sub(PAD), (p + needle.len() + PAD).min(hay.len())),
+        None => (0, hay.len().min(80)),
+    };
+    let mut s = String::new();
+    if start > 0 {
+        s.push('…');
+    }
+    s.extend(&hay[start..end]);
+    if end < hay.len() {
+        s.push('…');
+    }
+    s.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+/// Index-free full-text search across one workspace's conversations. Scans the
+/// per-conversation JSON at query time — no index to build, stale, or corrupt.
+/// Case-insensitive substring over titles and message content.
+pub fn search(app: &AppHandle, workspace_id: &str, query: &str) -> Result<Vec<SearchHit>> {
+    let q = query.trim().to_lowercase();
+    if q.is_empty() {
+        return Ok(Vec::new());
+    }
+    let dir = chats_dir(app, workspace_id)?;
+    let mut hits = Vec::new();
+    for entry in fs::read_dir(dir)? {
+        let entry = entry?;
+        if entry.path().extension().map(|e| e != "json").unwrap_or(true) {
+            continue;
+        }
+        // A file that vanishes or won't parse mid-scan is skipped, never fatal.
+        let Ok(text) = fs::read_to_string(entry.path()) else { continue };
+        let Ok(conv) = serde_json::from_str::<Conversation>(&text) else { continue };
+
+        let title_hit = conv.title.to_lowercase().contains(&q);
+        let mut matches = Vec::new();
+        for (i, m) in conv.messages.iter().enumerate() {
+            if m.content.to_lowercase().contains(&q) {
+                matches.push(SearchMatch {
+                    message_index: i,
+                    role: m.role.clone(),
+                    snippet: snippet(&m.content, &q),
+                });
+                if matches.len() >= MAX_MATCHES_PER_CONV {
+                    break;
+                }
+            }
+        }
+        if title_hit || !matches.is_empty() {
+            hits.push(SearchHit {
+                id: conv.id,
+                title: conv.title,
+                updated_at: conv.updated_at,
+                message_count: conv.messages.len(),
+                matches,
+            });
+        }
+    }
+    hits.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
+    Ok(hits)
+}
+
+// ── Export ────────────────────────────────────────────────────
+
+/// Render a conversation as readable Markdown — turns as headings, stats as a
+/// quiet blockquote, sources and tool calls noted so nothing is silently lost.
+fn to_markdown(conv: &Conversation) -> String {
+    use std::fmt::Write;
+    let mut s = String::new();
+    let _ = writeln!(s, "# {}\n", conv.title);
+    let _ = writeln!(
+        s,
+        "> {} message{} · updated {}\n",
+        conv.messages.len(),
+        if conv.messages.len() == 1 { "" } else { "s" },
+        conv.updated_at
+    );
+    for m in &conv.messages {
+        let who = match m.role.as_str() {
+            "user" => "You",
+            "assistant" => "Assistant",
+            other => other,
+        };
+        let _ = writeln!(s, "## {who}\n\n{}\n", m.content.trim());
+        if !m.sources.is_empty() {
+            let names: Vec<&str> = m.sources.iter().map(|src| src.doc_name.as_str()).collect();
+            let _ = writeln!(s, "> Sources: {}\n", names.join(", "));
+        }
+        for step in &m.tool_steps {
+            let _ = writeln!(s, "> Tool `{}` → {}\n", step.tool, step.result.trim());
+        }
+        if let Some(st) = &m.stats {
+            let _ = writeln!(
+                s,
+                "> {:.1}s to first token · {:.1} tok/s · {} ctx{}\n",
+                st.ttft_ms as f64 / 1000.0,
+                st.predicted_per_second,
+                st.context_used,
+                if st.gpu_active { "" } else { " · CPU" }
+            );
+        }
+    }
+    s
+}
+
+/// Write a conversation to a user-chosen path as `markdown` or `json`.
+pub fn export(
+    app: &AppHandle,
+    workspace_id: &str,
+    conv_id: &str,
+    format: &str,
+    dest: &str,
+) -> Result<()> {
+    let conv = load(app, workspace_id, conv_id)?;
+    let content = match format {
+        "json" => serde_json::to_string_pretty(&conv)?,
+        _ => to_markdown(&conv),
+    };
+    fs::write(dest, content)?;
+    log::info!(target: "chat", "exported conversation {conv_id} as {format} to {dest}");
+    Ok(())
+}
+
 fn title_from(message: &str) -> String {
     let t: String = message.trim().chars().take(48).collect();
     if t.is_empty() { "New session".into() } else { t }
@@ -820,6 +996,65 @@ pub fn cancel(ops: &Ops, conversation_id: &str) {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    fn msg(role: &str, content: &str) -> ChatMessage {
+        ChatMessage {
+            role: role.into(),
+            content: content.into(),
+            ts: "2026-07-03T00:00:00Z".into(),
+            stats: None,
+            sources: Vec::new(),
+            tool_steps: Vec::new(),
+        }
+    }
+
+    fn conv_with(msgs: Vec<ChatMessage>) -> Conversation {
+        Conversation {
+            schema: 1,
+            id: "c1".into(),
+            workspace_id: "w1".into(),
+            title: "Reactor notes".into(),
+            model_sha: None,
+            created_at: "2026-07-03T00:00:00Z".into(),
+            updated_at: "2026-07-03T00:00:00Z".into(),
+            messages: msgs,
+        }
+    }
+
+    #[test]
+    fn snippet_centers_on_the_hit_and_collapses_whitespace() {
+        let content = "The quick brown fox\njumps over the lazy calibration constant 8827 kelvin.";
+        let s = snippet(content, "8827");
+        assert!(s.contains("8827"));
+        assert!(!s.contains('\n'), "newlines collapsed");
+        // Match is mid-string, so the preview is elided on the left.
+        assert!(s.starts_with('…'));
+    }
+
+    #[test]
+    fn snippet_is_case_insensitive_and_multibyte_safe() {
+        // Leading multibyte chars must not cause a panic or bad boundary.
+        let content = "café ☕ RÉACTEUR details about the Meridian core";
+        let s = snippet(content, "réacteur");
+        assert!(s.to_lowercase().contains("réacteur"));
+    }
+
+    #[test]
+    fn markdown_export_labels_turns_and_notes_tools() {
+        let mut m = msg("assistant", "The sum is 99208.");
+        m.tool_steps.push(ToolStep {
+            server: "everything".into(),
+            tool: "get-sum".into(),
+            arguments: "{\"a\":1}".into(),
+            result: "99208".into(),
+            ok: true,
+        });
+        let md = to_markdown(&conv_with(vec![msg("user", "add them"), m]));
+        assert!(md.contains("# Reactor notes"));
+        assert!(md.contains("## You"));
+        assert!(md.contains("## Assistant"));
+        assert!(md.contains("Tool `get-sum`"));
+    }
 
     fn sum_schema() -> serde_json::Value {
         json!({

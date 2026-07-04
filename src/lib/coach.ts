@@ -47,6 +47,17 @@ export const WALKTHROUGHS: Record<string, Walkthrough> = {
       },
     ],
   },
+  conversations: {
+    id: "conversations",
+    steps: [
+      {
+        target: "conv-search",
+        title: "Find anything you've discussed",
+        body: "Search runs across every conversation in this workspace — titles and message text — and jumps you straight to the match. Double-click a session to rename it, or use the export icon to save one as Markdown.",
+        placement: "right",
+      },
+    ],
+  },
   knowledge: {
     id: "knowledge",
     steps: [

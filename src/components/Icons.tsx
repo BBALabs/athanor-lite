@@ -121,6 +121,26 @@ export function PlusIcon(props: IconProps) {
   );
 }
 
+/** Search: a lens over the record. */
+export function SearchIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <circle cx="11" cy="11" r="6.5" />
+      <path d="M16 16l3.5 3.5" />
+    </svg>
+  );
+}
+
+/** Export: lift a copy out to the file system. */
+export function ExportIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M12 15V4M8 8l4-4 4 4" />
+      <path d="M5 14v4.5c0 .8.7 1.5 1.5 1.5h11c.8 0 1.5-.7 1.5-1.5V14" strokeOpacity={0.6} />
+    </svg>
+  );
+}
+
 export function TrashIcon(props: IconProps) {
   return (
     <svg {...base(props)}>

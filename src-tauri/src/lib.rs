@@ -228,6 +228,39 @@ fn delete_conversation(
 }
 
 #[tauri::command]
+fn rename_conversation(
+    app: tauri::AppHandle,
+    workspace_id: String,
+    conversation_id: String,
+    title: String,
+) -> Result<Vec<chat::ConversationMeta>> {
+    chat::rename(&app, &workspace_id, &conversation_id, &title)
+}
+
+#[tauri::command]
+async fn search_conversations(
+    app: tauri::AppHandle,
+    workspace_id: String,
+    query: String,
+) -> Result<Vec<chat::SearchHit>> {
+    // Off the UI thread — a big workspace's scan shouldn't stutter typing.
+    tauri::async_runtime::spawn_blocking(move || chat::search(&app, &workspace_id, &query))
+        .await
+        .map_err(|e| error::AthanorError::Chat(format!("search task failed: {e}")))?
+}
+
+#[tauri::command]
+fn export_conversation(
+    app: tauri::AppHandle,
+    workspace_id: String,
+    conversation_id: String,
+    format: String,
+    dest: String,
+) -> Result<()> {
+    chat::export(&app, &workspace_id, &conversation_id, &format, &dest)
+}
+
+#[tauri::command]
 fn stop_engine(app: tauri::AppHandle, llm: tauri::State<'_, Llm>) {
     runtime::server::stop(&app, &llm);
 }
@@ -875,6 +908,9 @@ pub fn run() {
             list_conversations,
             get_conversation,
             delete_conversation,
+            rename_conversation,
+            search_conversations,
+            export_conversation,
             stop_engine,
             get_metrics_settings,
             set_metrics_share,

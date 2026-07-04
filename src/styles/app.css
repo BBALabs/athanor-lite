@@ -1482,14 +1482,120 @@
 
 .session__meta { font-size: 10.5px; }
 
-.session__delete {
+/* Row actions (export · delete) — revealed on hover, top-right. */
+.session__actions {
   position: absolute;
-  top: 8px;
+  top: 7px;
   right: 6px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
   opacity: 0;
+  transition: opacity var(--t-hover) var(--glide);
 }
 
-.session:hover .session__delete { opacity: 1; }
+.session:hover .session__actions,
+.session--active .session__actions {
+  opacity: 1;
+}
+
+.session__act {
+  color: var(--ink-low);
+  padding: 3px;
+  border-radius: 6px;
+  transition: color var(--t-hover) var(--glide), background var(--t-hover) var(--glide);
+}
+
+.session__act:hover {
+  color: var(--lume-warm);
+  background: var(--srf-2);
+}
+
+/* Inline rename — a luminous baseline, no box. */
+.session__rename {
+  font-size: 12.5px;
+  color: var(--ink-hi);
+  background: var(--srf-2);
+  border-radius: 6px;
+  padding: 2px 6px;
+  box-shadow: inset 0 -1px 0 var(--lume);
+}
+
+/* Search box in the rail head. */
+.sessions__search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  margin-bottom: 6px;
+  border-radius: var(--r-el);
+  background: var(--srf-1);
+  color: var(--ink-low);
+  transition: box-shadow var(--t-hover) var(--glide);
+}
+
+.sessions__search:focus-within {
+  box-shadow: inset 0 -1px 0 var(--lume);
+}
+
+.sessions__search input {
+  flex: 1;
+  min-width: 0;
+  font-size: 12.5px;
+  color: var(--ink-hi);
+  background: transparent;
+}
+
+.sessions__search input::placeholder { color: var(--ink-low); }
+
+.sessions__search-clear {
+  flex: none;
+  color: var(--ink-low);
+  padding: 2px;
+  border-radius: 5px;
+  transition: color var(--t-hover) var(--glide);
+}
+
+.sessions__search-clear:hover { color: var(--ink-hi); }
+
+/* Search results — the list the rail shows while a query is active. */
+.search-results {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.search-hit {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 10px 12px;
+  border-radius: var(--r-el);
+  text-align: left;
+  transition: background var(--t-hover) var(--glide);
+}
+
+.search-hit:hover { background: var(--srf-2); }
+
+.search-hit__title {
+  font-size: 12.5px;
+  color: var(--ink-hi);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.search-hit__meta { font-size: 10.5px; }
+
+.search-hit__snippet {
+  font-size: 11.5px;
+  color: var(--ink-low);
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
 
 .sessions__empty {
   padding: 12px;
