@@ -217,6 +217,7 @@ export function Knowledge() {
   const setRetrievalEnabled = useStore((s) => s.setRetrievalEnabled);
   const loadKnowledge = useStore((s) => s.loadKnowledge);
   const setView = useStore((s) => s.setView);
+  const maybeStartCoach = useStore((s) => s.maybeStartCoach);
   const [dragging, setDragging] = useState(false);
   const [addingMcp, setAddingMcp] = useState(false);
 
@@ -225,6 +226,11 @@ export function Knowledge() {
   useEffect(() => {
     void loadKnowledge();
   }, [activeId, loadKnowledge]);
+
+  // First time a user opens Knowledge with a workspace, teach it by doing.
+  useEffect(() => {
+    if (ws) maybeStartCoach("knowledge");
+  }, [ws, maybeStartCoach]);
 
   // Tauri delivers OS file drops as a window event, not the DOM drop event.
   useEffect(() => {
@@ -294,7 +300,7 @@ export function Knowledge() {
           </span>
         </div>
         {knowledge && docs.length > 0 && (
-          <label className="kb-retrieval">
+          <label className="kb-retrieval" data-coach="kb-retrieval">
             <span className="t-quiet">retrieval</span>
             <button
               className={`switch${knowledge.retrievalEnabled ? " switch--on" : ""}`}
@@ -310,6 +316,7 @@ export function Knowledge() {
 
       <div
         className={`kb-drop${dragging ? " kb-drop--over" : ""}`}
+        data-coach="kb-drop"
         onDragOver={(e) => {
           e.preventDefault();
           setDragging(true);

@@ -239,6 +239,7 @@ let onChatDeltaHandler: ((d: ChatDelta) => void) | null = null;
 let onChatDoneHandler: ((d: ChatDone) => void) | null = null;
 let onChatToolHandler: ((t: unknown) => void) | null = null;
 let onOpsHandler: ((ops: Operation[]) => void) | null = null;
+let harnessCoachSeen: string[] = [];
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const harnessDocs: any[] = [
@@ -610,6 +611,15 @@ export const harnessIpc = {
   // first-run flow without wiping real data.
   onboardingNeeded: async () => window.location.hash === "#onboarding",
   setOnboarded: async () => {},
+  getCoachState: async () => ({ schema: 1, seen: harnessCoachSeen }),
+  coachMarkSeen: async (id: string) => {
+    if (!harnessCoachSeen.includes(id)) harnessCoachSeen = [...harnessCoachSeen, id].sort();
+    return { schema: 1, seen: harnessCoachSeen };
+  },
+  coachReset: async () => {
+    harnessCoachSeen = [];
+    return { schema: 1, seen: harnessCoachSeen };
+  },
   checkForUpdate: async () => ({
     currentVersion: "0.1.0",
     available: null,

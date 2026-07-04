@@ -8,6 +8,7 @@ mod models;
 mod ops;
 mod rag;
 mod runtime;
+mod uistate;
 mod workspaces;
 
 use downloads::LibraryModel;
@@ -365,6 +366,21 @@ fn onboarding_needed(app: tauri::AppHandle) -> Result<bool> {
 fn set_onboarded(app: tauri::AppHandle) -> Result<()> {
     std::fs::write(workspaces::data_root(&app)?.join(".onboarded"), b"1")?;
     Ok(())
+}
+
+#[tauri::command]
+fn get_coach_state(app: tauri::AppHandle) -> Result<uistate::CoachState> {
+    uistate::load(&app)
+}
+
+#[tauri::command]
+fn coach_mark_seen(app: tauri::AppHandle, id: String) -> Result<uistate::CoachState> {
+    uistate::mark_seen(&app, &id)
+}
+
+#[tauri::command]
+fn coach_reset(app: tauri::AppHandle) -> Result<uistate::CoachState> {
+    uistate::reset(&app)
 }
 
 #[tauri::command]
@@ -865,6 +881,9 @@ pub fn run() {
             start_engine,
             onboarding_needed,
             set_onboarded,
+            get_coach_state,
+            coach_mark_seen,
+            coach_reset,
             check_for_update,
             list_operations,
             cancel_operation,

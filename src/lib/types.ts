@@ -370,6 +370,12 @@ export interface MetricsSettings {
   share: boolean;
 }
 
+/** Which contextual walkthroughs the user has already completed or dismissed. */
+export interface CoachState {
+  schema: number;
+  seen: string[];
+}
+
 export interface MetricsRecord {
   schema: number;
   ts: string;

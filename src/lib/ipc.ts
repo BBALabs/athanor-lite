@@ -15,6 +15,7 @@ import type {
   ChatDone,
   ChatRetrieval,
   ChatToolEvent,
+  CoachState,
   Conversation,
   ConversationMeta,
   KnowledgeBase,
@@ -114,6 +115,9 @@ const tauriIpc = {
   startEngine: (workspaceId: string) => invoke<void>("start_engine", { workspaceId }),
   onboardingNeeded: () => invoke<boolean>("onboarding_needed"),
   setOnboarded: () => invoke<void>("set_onboarded"),
+  getCoachState: () => invoke<CoachState>("get_coach_state"),
+  coachMarkSeen: (id: string) => invoke<CoachState>("coach_mark_seen", { id }),
+  coachReset: () => invoke<CoachState>("coach_reset"),
   checkForUpdate: () =>
     invoke<{ currentVersion: string; available: string | null; note: string }>(
       "check_for_update",

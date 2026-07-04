@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { ipc } from "../lib/ipc";
+import { getWalkthrough } from "../lib/coach";
 import {
   isAthanorError,
   type Catalog,
@@ -75,6 +76,12 @@ interface AthanorStore {
   /** Tool calls the model made during the in-flight turn, in call order. */
   liveToolSteps: ToolStep[];
 
+  // Coach / contextual walkthroughs
+  /** Walkthrough ids already completed or dismissed (loaded from disk). */
+  coachSeen: string[];
+  /** The walkthrough playing right now, and which step. */
+  activeCoach: { id: string; step: number } | null;
+
   setView: (v: View) => void;
   dismissOnboarding: () => void;
   setOpsOpen: (open: boolean) => void;
@@ -112,6 +119,12 @@ interface AthanorStore {
   activateWorkspace: (id: string) => Promise<void>;
   deleteWorkspace: (id: string) => Promise<void>;
   clearOpError: () => void;
+
+  // Coach
+  maybeStartCoach: (id: string) => void;
+  advanceCoach: () => void;
+  endCoach: (opts?: { seen?: boolean }) => void;
+  replayCoaches: () => Promise<void>;
 }
 
 function errText(e: unknown): string {
@@ -157,6 +170,8 @@ export const useStore = create<AthanorStore>((set, get) => ({
   mcpServers: [],
   liveSources: [],
   liveToolSteps: [],
+  coachSeen: [],
+  activeCoach: null,
 
   setView: (view) => set({ view }),
   dismissOnboarding: () => set({ onboardingNeeded: false }),
@@ -440,6 +455,14 @@ export const useStore = create<AthanorStore>((set, get) => ({
       console.error("chat streams unavailable", e);
     }
 
+    // Which walkthroughs the user has already seen (quiet — optional sugar).
+    try {
+      const coach = await ipc.getCoachState();
+      set({ coachSeen: coach.seen });
+    } catch {
+      /* coaches simply all show once if this fails */
+    }
+
     try {
       const needed = await ipc.onboardingNeeded();
       const s = get();
@@ -667,6 +690,57 @@ export const useStore = create<AthanorStore>((set, get) => ({
   },
 
   clearOpError: () => set({ lastOpError: null }),
+
+  // ── Coach / contextual walkthroughs ───────────────────────────
+  maybeStartCoach: (id) => {
+    const s = get();
+    // Never interrupt: skip if unseen-only fails, another coach is up, or
+    // onboarding owns the screen.
+    if (s.activeCoach || s.onboardingNeeded) return;
+    if (s.coachSeen.includes(id)) return;
+    if (!getWalkthrough(id)) return;
+    set({ activeCoach: { id, step: 0 } });
+  },
+
+  advanceCoach: () => {
+    const s = get();
+    const active = s.activeCoach;
+    if (!active) return;
+    const wt = getWalkthrough(active.id);
+    if (!wt) {
+      set({ activeCoach: null });
+      return;
+    }
+    if (active.step + 1 >= wt.steps.length) {
+      // Finished — mark seen so it never fires again.
+      get().endCoach({ seen: true });
+    } else {
+      set({ activeCoach: { id: active.id, step: active.step + 1 } });
+    }
+  },
+
+  endCoach: (opts) => {
+    const active = get().activeCoach;
+    if (!active) return;
+    if (opts?.seen) {
+      set((st) => ({
+        coachSeen: st.coachSeen.includes(active.id)
+          ? st.coachSeen
+          : [...st.coachSeen, active.id],
+      }));
+      void ipc.coachMarkSeen(active.id).catch(() => {});
+    }
+    set({ activeCoach: null });
+  },
+
+  replayCoaches: async () => {
+    try {
+      await ipc.coachReset();
+      set({ coachSeen: [], activeCoach: null });
+    } catch (e) {
+      set({ lastOpError: errText(e) });
+    }
+  },
 }));
 
 /** Latest telemetry sample, or null before the stream warms up. */

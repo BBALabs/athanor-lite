@@ -2348,6 +2348,98 @@
 
 .toast__close:hover { color: var(--ink-hi); }
 
+/* ── Coach — contextual walkthroughs ───────────────────────── */
+/* The container never eats clicks; only the scrim panels and callout do, so
+   the spotlit control (the gap between the panels) stays fully interactive. */
+.coach {
+  position: fixed;
+  inset: 0;
+  z-index: 95;
+  pointer-events: none;
+}
+
+.coach__scrim {
+  position: fixed;
+  background: rgba(4, 2, 8, 0.62);
+  backdrop-filter: blur(1.5px);
+  pointer-events: auto;
+  animation: coachFade var(--t-layout) var(--glide) both;
+}
+
+.coach__scrim--full { backdrop-filter: blur(2px); }
+
+/* Light surfacing on the target — glow, never a hard ring (spec §1, §6). */
+.coach__halo {
+  position: fixed;
+  border-radius: var(--r-el);
+  pointer-events: none;
+  box-shadow:
+    var(--catchlight),
+    0 0 0 1px rgba(160, 107, 255, 0.22),
+    0 0 22px 3px rgba(160, 107, 255, 0.34),
+    0 0 60px 10px rgba(160, 107, 255, 0.16);
+  animation: coachFade var(--t-layout) var(--glide) both;
+}
+
+.coach__callout {
+  position: fixed;
+  pointer-events: auto;
+  padding: var(--sp-3);
+  border-radius: var(--r-srf);
+  background: rgba(18, 13, 26, 0.94);
+  backdrop-filter: blur(24px);
+  box-shadow: var(--catchlight), var(--depth), var(--underglow);
+  animation: sheetRise 460ms var(--glide) both;
+}
+
+.coach__title {
+  font-size: 20px;
+  line-height: 1.2;
+}
+
+.coach__body {
+  margin-top: 10px;
+  font-size: 13px;
+  line-height: 1.62;
+  color: var(--ink-mid);
+}
+
+.coach__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: var(--sp-3);
+}
+
+.coach__dots {
+  display: flex;
+  gap: 6px;
+}
+
+.coach__dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--ink-ghost);
+  transition: background var(--t-hover) var(--glide), box-shadow var(--t-hover) var(--glide);
+}
+
+.coach__dot--on {
+  background: var(--lume-warm);
+  box-shadow: 0 0 8px rgba(160, 107, 255, 0.6);
+}
+
+.coach__actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+@keyframes coachFade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
 /* ── Sparkline ─────────────────────────────────────────────── */
 
 .sparkline { display: block; }

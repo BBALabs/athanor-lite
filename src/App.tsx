@@ -6,6 +6,7 @@ import { BootSequence } from "./components/BootSequence";
 import { Onboarding } from "./components/Onboarding";
 import { OpsDrawer } from "./components/OpsDrawer";
 import { SettingsSheet } from "./components/SettingsSheet";
+import { Coach } from "./components/Coach";
 import { Chat } from "./views/Chat";
 import { Knowledge } from "./views/Knowledge";
 import { Dashboard } from "./views/Dashboard";
@@ -149,6 +150,7 @@ export default function App() {
       <OpErrorToast />
       {showSettings && <SettingsSheet onDone={() => setShowSettings(false)} />}
       {boot === "ready" && onboardingNeeded && <Onboarding onDone={dismissOnboarding} />}
+      {boot === "ready" && !onboardingNeeded && <Coach />}
       <BootSequence />
     </div>
   );
