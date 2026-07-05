@@ -556,6 +556,7 @@ version = "0.1.0"
 dependencies = [
  "arrow-array",
  "arrow-schema",
+ "base64 0.22.1",
  "chrono",
  "futures",
  "hex",
@@ -565,6 +566,7 @@ dependencies = [
  "pdf-extract",
  "quick-xml 0.36.2",
  "reqwest 0.12.28",
+ "ring",
  "serde",
  "serde_json",
  "sha2",

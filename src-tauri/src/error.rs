@@ -30,6 +30,19 @@ pub enum AthanorError {
     #[error("MCP error: {0}")]
     Mcp(String),
 
+    #[error("licensing error: {0}")]
+    License(String),
+
+    /// A capability gated behind a higher tier. Serialized with the extra fields
+    /// the frontend needs to render a designed upgrade card (never a raw error).
+    #[error("{message}")]
+    FeatureLimited {
+        feature: String,
+        tier: String,
+        message: String,
+        upgrade_hint: String,
+    },
+
     #[error("filesystem error: {0}")]
     Io(#[from] std::io::Error),
 
@@ -51,6 +64,8 @@ impl AthanorError {
             AthanorError::Chat(_) => "CHAT",
             AthanorError::Rag(_) => "RAG",
             AthanorError::Mcp(_) => "MCP",
+            AthanorError::License(_) => "LICENSE",
+            AthanorError::FeatureLimited { .. } => "FEATURE_LIMITED",
             AthanorError::Io(_) => "IO",
             AthanorError::Serde(_) => "SERDE",
             AthanorError::Path(_) => "PATH",
@@ -64,10 +79,25 @@ impl serde::Serialize for AthanorError {
         serializer: S,
     ) -> std::result::Result<S::Ok, S::Error> {
         use serde::ser::SerializeStruct;
-        let mut st = serializer.serialize_struct("AthanorError", 2)?;
-        st.serialize_field("code", self.code())?;
-        st.serialize_field("message", &self.to_string())?;
-        st.end()
+        match self {
+            // Feature gates carry the upgrade context so the UI can render a
+            // designed upgrade card keyed on `code === "FEATURE_LIMITED"`.
+            AthanorError::FeatureLimited { feature, tier, upgrade_hint, .. } => {
+                let mut st = serializer.serialize_struct("AthanorError", 5)?;
+                st.serialize_field("code", self.code())?;
+                st.serialize_field("message", &self.to_string())?;
+                st.serialize_field("feature", feature)?;
+                st.serialize_field("requiredTier", tier)?;
+                st.serialize_field("upgradeHint", upgrade_hint)?;
+                st.end()
+            }
+            _ => {
+                let mut st = serializer.serialize_struct("AthanorError", 2)?;
+                st.serialize_field("code", self.code())?;
+                st.serialize_field("message", &self.to_string())?;
+                st.end()
+            }
+        }
     }
 }
 

@@ -2,7 +2,9 @@ mod benchmark;
 mod chat;
 mod downloads;
 mod error;
+mod features;
 mod hardware;
+mod licensing;
 mod mcp;
 mod metrics;
 mod models;
@@ -494,6 +496,30 @@ fn is_portable() -> bool {
     portable::is_portable()
 }
 
+// ── Licensing & feature gates ─────────────────────────────────
+
+#[tauri::command]
+fn get_license_status(app: tauri::AppHandle) -> licensing::LicenseStatus {
+    licensing::status(&app)
+}
+
+#[tauri::command]
+fn activate_license(app: tauri::AppHandle, key: String) -> Result<licensing::LicenseStatus> {
+    licensing::activate(&app, &key)
+}
+
+#[tauri::command]
+fn deactivate_license(app: tauri::AppHandle) -> Result<licensing::LicenseStatus> {
+    licensing::deactivate(&app)
+}
+
+/// The full gate map at the current tier — the single source the UI reads to
+/// render Pro badges and upgrade cards.
+#[tauri::command]
+fn get_feature_matrix() -> features::FeatureMatrix {
+    features::snapshot()
+}
+
 // ── Fine-tuning: dataset studio ───────────────────────────────
 
 #[tauri::command]
@@ -503,6 +529,9 @@ async fn import_dataset(
     name: String,
     path: String,
 ) -> Result<training::DatasetReport> {
+    // Fine-tuning (dataset studio + training runs) is a Pro feature. A Free user
+    // sees the studio but gets the designed upgrade card on import.
+    features::require(features::Feature::FineTuning)?;
     tauri::async_runtime::spawn_blocking(move || training::import(&app, &workspace_id, &name, &path))
         .await
         .map_err(|e| error::AthanorError::Workspace(format!("import task failed: {e}")))?
@@ -712,6 +741,12 @@ fn create_workspace(
     template_id: Option<String>,
 ) -> Result<Workspace> {
     let _guard = lock.acquire();
+    // Free tier is capped at 3 workspaces. The gate lives at the command
+    // boundary (not workspaces::create) so system paths — self-tests, the
+    // onboarding "My Chat" — are never blocked. Hitting the cap returns a
+    // designed FeatureLimited state, not a wall.
+    let count = workspaces::list(&app)?.workspaces.len() as u32;
+    features::enforce_limit(features::Limit::Workspaces, count)?;
     workspaces::create(&app, &name, &purpose, accent_hue, &glyph, template_id)
 }
 
@@ -1080,7 +1115,12 @@ pub fn run() {
         .manage(Ops::default())
         .manage(Embedder::default())
         .manage(McpManager::default())
+        .manage(licensing::LicenseState::default())
         .setup(|app| {
+            // Resolve the local license and publish the tier before anything
+            // else reads a gate. Offline, fail-closed to Free, never blocks boot.
+            licensing::init(&app.handle());
+
             let handle = app.handle().clone();
             if let Err(e) = std::thread::Builder::new()
                 .name("hw-telemetry".into())
@@ -1240,7 +1280,11 @@ pub fn run() {
             save_mcp_server,
             remove_mcp_server,
             connect_mcp_server,
-            disconnect_mcp_server
+            disconnect_mcp_server,
+            get_license_status,
+            activate_license,
+            deactivate_license,
+            get_feature_matrix
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

@@ -26,3 +26,10 @@ dist-ssr
 # local safety backups
 *.bak
 *.bak[0-9]
+
+# licensing/signing key material — NEVER commit. Private signing key lives at
+# ~/.athanor-release/; user license tokens live in the app data root.
+license.key
+*-signing.key
+*.pkcs8
+athanor-data/
