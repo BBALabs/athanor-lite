@@ -36,6 +36,21 @@ if (!IN_TAURI && typeof document !== "undefined") {
 
 const GIB = 1024 ** 3;
 
+/**
+ * Hardware scenario for design review, switched by URL hash (like
+ * `#onboarding` below): `#cpu` = no dedicated GPU, `#dualgpu` = 2×24 GB
+ * pooled. Default is the single-GPU workstation.
+ */
+type HwScenario = "default" | "cpu" | "dualgpu";
+const HW_SCENARIO: HwScenario =
+  typeof window === "undefined"
+    ? "default"
+    : window.location.hash === "#cpu"
+      ? "cpu"
+      : window.location.hash === "#dualgpu"
+        ? "dualgpu"
+        : "default";
+
 /** A representative workstation profile for design review. */
 const HW: HardwareReport = {
   cpu: {
@@ -70,12 +85,39 @@ const HW: HardwareReport = {
   detectedAt: new Date().toISOString(),
 };
 
+if (HW_SCENARIO === "cpu") {
+  HW.cpu.brand = "Intel Core i5-12400";
+  HW.cpu.physicalCores = 6;
+  HW.cpu.logicalCores = 12;
+  HW.memory = { totalBytes: 16 * GIB, availableBytes: 9 * GIB };
+  HW.gpus = [];
+  HW.computeClass = "CpuOnly";
+} else if (HW_SCENARIO === "dualgpu") {
+  const card = (i: number) => ({
+    name: "NVIDIA GeForce RTX 3090",
+    vendor: "Nvidia" as const,
+    vramTotalBytes: 24 * GIB,
+    vramUsedBytes: (i === 0 ? 1.8 : 0.3) * GIB,
+    driverVersion: "580.88",
+    cudaVersion: "13.0",
+    architecture: "Ampere",
+    computeCapability: "8.6",
+    temperatureC: 41 + i * 3,
+    utilizationPct: 4,
+    source: "nvml",
+  });
+  HW.gpus = [card(0), card(1)];
+  HW.computeClass = "VramWorkstation";
+}
+
 /* Mirror of the Rust budget/fit rules (recommend.rs) for harness data only. */
 const VRAM_USABLE_FRACTION = 0.95;
 const RUNTIME_RESERVE_GB = 0.5;
 
 function budgetGb(): number {
-  const vram = (HW.gpus[0].vramTotalBytes ?? 0) / GIB;
+  // CPU-only machines budget against half of system RAM, like the backend.
+  if (HW.gpus.length === 0) return HW.memory.totalBytes / GIB / 2;
+  const vram = HW.gpus.reduce((sum, g) => sum + (g.vramTotalBytes ?? 0) / GIB, 0);
   return vram * VRAM_USABLE_FRACTION - RUNTIME_RESERVE_GB;
 }
 
@@ -87,6 +129,7 @@ function pickFor(entryId: string, budget: number): Pick | null {
     .sort((a, b) => b.minMemGb - a.minMemGb)[0];
   if (!quant) return null;
   const headroomGb = budget - quant.minMemGb;
+  const cpuOnly = HW.gpus.length === 0;
   return {
     entryId: e.id,
     name: e.name,
@@ -100,11 +143,12 @@ function pickFor(entryId: string, budget: number): Pick | null {
     estMemGb: quant.minMemGb,
     headroomGb,
     headroomPct: (headroomGb / budget) * 100,
-    fitMode: headroomGb >= budget * 0.15 ? "gpuFull" : "gpuTight",
+    fitMode: cpuOnly ? "cpu" : headroomGb >= budget * 0.15 ? "gpuFull" : "gpuTight",
     gpuOffloadPct: null,
-    maxCtx: e.contextLength,
-    note:
-      headroomGb >= 8
+    maxCtx: cpuOnly ? 0 : e.contextLength,
+    note: cpuOnly
+      ? `Runs on the processor — expect a reading pace, fully private.`
+      : headroomGb >= 8
         ? `Runs fully on the GPU with ${headroomGb.toFixed(1)} GB to spare — full context.`
         : `Fits on the GPU with ${headroomGb.toFixed(1)} GB of headroom.`,
   };
@@ -135,7 +179,8 @@ function recommendations(): RecommendationSet {
       const kvPerTok = Math.max(0, q.minMemGb - q.fileGb - OVERHEAD) / 8192;
       const est = q.fileGb + OVERHEAD + kvPerTok * 8192;
       let fitMode: Pick["fitMode"];
-      if (est <= budget * 0.85) fitMode = "gpuFull";
+      if (HW.gpus.length === 0) fitMode = est <= budget ? "cpu" : "exceeds";
+      else if (est <= budget * 0.85) fitMode = "gpuFull";
       else if (est <= budget) fitMode = "gpuTight";
       else if (est <= HW.memory.totalBytes / 1024 ** 3 / 2) fitMode = "partialOffload";
       else fitMode = "exceeds";
@@ -156,23 +201,29 @@ function recommendations(): RecommendationSet {
     }),
   );
 
+  const totalVramGb = HW.gpus.reduce((s, g) => s + (g.vramTotalBytes ?? 0) / GIB, 0);
   return {
-    mode: "gpuFull",
+    mode: HW.gpus.length === 0 ? "cpuOnly" : "gpuFull",
     computeClass: HW.computeClass,
     budgetGb: budget,
     ramBudgetGb: HW.memory.totalBytes / 1024 ** 3 / 2,
-    gpuCount: 1,
-    multiGpu: false,
-    vramInUseGb: (HW.gpus[0].vramUsedBytes ?? 0) / 1024 ** 3,
+    gpuCount: HW.gpus.length,
+    multiGpu: HW.gpus.length > 1,
+    vramInUseGb: HW.gpus.reduce((s, g) => s + (g.vramUsedBytes ?? 0) / GIB, 0),
     defaultCtx: 8192,
     best: chat[0] ?? null,
     alternates: chat.slice(1, 4),
     byRole,
     fits,
-    notes: [
-      `Budget: ${budget.toFixed(1)} GB usable of 48 GB VRAM (95% usable minus VRAM in use).`,
-      `Fit shown at 8K context; each pick lists the largest context it can hold.`,
-    ],
+    notes:
+      HW.gpus.length === 0
+        ? [
+            `No dedicated GPU — models run on the processor from ${budget.toFixed(1)} GB of system memory.`,
+          ]
+        : [
+            `Budget: ${budget.toFixed(1)} GB usable of ${totalVramGb.toFixed(0)} GB VRAM (95% usable minus VRAM in use).`,
+            `Fit shown at 8K context; each pick lists the largest context it can hold.`,
+          ],
   };
 }
 
@@ -764,6 +815,9 @@ export const harnessIpc = {
   getDataRoot: async () => "C:\\Users\\you\\AppData\\Roaming\\com.bba.athanor",
   revealDataRoot: async () => {},
   isPortable: async () => false,
+  openLink: async (url: string) => {
+    window.open(url, "_blank", "noopener,noreferrer");
+  },
   importDataset: async (_workspaceId: string, name: string) => {
     const id = `ds-${Date.now()}`;
     harnessDatasets = [
@@ -939,18 +993,16 @@ export const harnessIpc = {
         tsMs: Date.now(),
         cpuUsagePct: cpu,
         memTotalBytes: HW.memory.totalBytes,
-        memUsedBytes: memUsed,
-        gpus: [
-          {
-            index: 0,
-            name: HW.gpus[0].name,
-            vramTotalBytes: HW.gpus[0].vramTotalBytes ?? 0,
-            vramUsedBytes: vramUsed,
-            // Realistic idle-to-busy band; the warn hue must mean something.
-            utilizationPct: Math.round(Math.max(6, Math.min(68, cpu * 0.9 + (Math.random() - 0.5) * 14))),
-            temperatureC: Math.round(46 + cpu / 6),
-          },
-        ],
+        memUsedBytes: Math.min(memUsed, HW.memory.totalBytes * 0.9),
+        gpus: HW.gpus.map((g, index) => ({
+          index,
+          name: g.name,
+          vramTotalBytes: g.vramTotalBytes ?? 0,
+          vramUsedBytes: index === 0 ? vramUsed : (g.vramUsedBytes ?? 0),
+          // Realistic idle-to-busy band; the warn hue must mean something.
+          utilizationPct: Math.round(Math.max(6, Math.min(68, cpu * 0.9 + (Math.random() - 0.5) * 14))),
+          temperatureC: Math.round(46 + cpu / 6),
+        })),
       });
     }, 1000);
     return () => window.clearInterval(timer);

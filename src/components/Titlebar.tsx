@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { IN_TAURI } from "../lib/tauriEnv";
+import { LITE } from "../lib/edition";
 import { CloseIcon, MarkIcon, MaximizeIcon, MinimizeIcon, RestoreIcon } from "./Icons";
 
 export function Titlebar() {
@@ -39,6 +40,11 @@ export function Titlebar() {
         <span className="titlebar__wordmark" data-tauri-drag-region>
           ATHANOR
         </span>
+        {LITE && (
+          <span className="titlebar__lite" data-tauri-drag-region>
+            LITE
+          </span>
+        )}
         {!IN_TAURI && (
           <span className="titlebar__harness" title="Browser design harness — hardware, telemetry, and workspaces shown here are synthetic. Run the desktop app for real data.">
             design harness · synthetic data

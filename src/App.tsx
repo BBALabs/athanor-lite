@@ -14,9 +14,12 @@ import { Models } from "./views/Models";
 import { Workspaces } from "./views/Workspaces";
 import { Training } from "./views/Training";
 import { Compare } from "./views/Compare";
+import { LiteHome } from "./views/LiteHome";
 import { AlertIcon, CloseIcon } from "./components/Icons";
 import { monogram } from "./lib/format";
 import { ACCENT_PRESETS } from "./lib/theme";
+import { BBA_URL, LITE } from "./lib/edition";
+import { ipc } from "./lib/ipc";
 
 /**
  * The Ambient Spine — the app's one light source. It breathes, flares once
@@ -98,7 +101,17 @@ function StatusBar() {
         )}
       </div>
       <div className="statusbar__cell statusbar__cell--right">
-        <span className="t-quiet">Black Box Analytics · 0.1.0</span>
+        {LITE ? (
+          <button
+            className="statusbar__bba t-quiet"
+            onClick={() => void ipc.openLink(BBA_URL).catch(() => {})}
+            title={BBA_URL}
+          >
+            Powered by Black Box Analytics
+          </button>
+        ) : (
+          <span className="t-quiet">Black Box Analytics · 0.1.0</span>
+        )}
       </div>
     </footer>
   );
@@ -144,13 +157,18 @@ export default function App() {
         <main className="shell__main" key={view}>
           {boot === "ready" && (
             <>
+              {view === "home" && <LiteHome />}
               {view === "chat" && <Chat />}
-              {view === "knowledge" && <Knowledge />}
-              {view === "dashboard" && <Dashboard />}
-              {view === "models" && <Models />}
-              {view === "compare" && <Compare />}
-              {view === "training" && <Training />}
-              {view === "workspaces" && <Workspaces />}
+              {!LITE && (
+                <>
+                  {view === "knowledge" && <Knowledge />}
+                  {view === "dashboard" && <Dashboard />}
+                  {view === "models" && <Models />}
+                  {view === "compare" && <Compare />}
+                  {view === "training" && <Training />}
+                  {view === "workspaces" && <Workspaces />}
+                </>
+              )}
             </>
           )}
         </main>
@@ -159,8 +177,10 @@ export default function App() {
       <OpsDrawer />
       <OpErrorToast />
       {showSettings && <SettingsSheet onDone={() => setShowSettings(false)} />}
-      {boot === "ready" && onboardingNeeded && <Onboarding onDone={dismissOnboarding} />}
-      {boot === "ready" && !onboardingNeeded && <Coach />}
+      {/* Lite has no overlay onboarding and no walkthroughs — Home *is* the
+          first-run experience, and there's nothing left to tour. */}
+      {!LITE && boot === "ready" && onboardingNeeded && <Onboarding onDone={dismissOnboarding} />}
+      {!LITE && boot === "ready" && !onboardingNeeded && <Coach />}
       <BootSequence />
     </div>
   );

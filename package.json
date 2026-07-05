@@ -6,8 +6,12 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "dev:lite": "vite --mode lite",
+    "build:lite": "tsc && vite build --mode lite",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "tauri:lite:dev": "tauri dev --config src-tauri/tauri.lite.conf.json",
+    "tauri:lite:build": "tauri build --config src-tauri/tauri.lite.conf.json"
   },
   "dependencies": {
     "@fontsource-variable/instrument-sans": "^5.2.8",

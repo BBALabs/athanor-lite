@@ -667,6 +667,43 @@ fn reveal_data_root(app: tauri::AppHandle) -> Result<()> {
     Ok(())
 }
 
+/// The only external pages the app will ever open — a hard allowlist, not a
+/// general-purpose opener. Anything else is refused.
+const ALLOWED_LINKS: &[&str] = &["https://bbasecure.com"];
+
+/// Open an allowlisted page in the system browser (Lite's maker's-mark link).
+#[tauri::command]
+fn open_link(url: String) -> Result<()> {
+    if !ALLOWED_LINKS.contains(&url.as_str()) {
+        return Err(error::AthanorError::Runtime(format!(
+            "refusing to open non-allowlisted url: {url}"
+        )));
+    }
+    #[cfg(target_os = "windows")]
+    let mut cmd = {
+        use std::os::windows::process::CommandExt;
+        // `start` needs an explicit (empty) window title before the url.
+        let mut c = std::process::Command::new("cmd");
+        c.args(["/c", "start", "", &url]);
+        c.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
+        c
+    };
+    #[cfg(target_os = "macos")]
+    let mut cmd = {
+        let mut c = std::process::Command::new("open");
+        c.arg(&url);
+        c
+    };
+    #[cfg(target_os = "linux")]
+    let mut cmd = {
+        let mut c = std::process::Command::new("xdg-open");
+        c.arg(&url);
+        c
+    };
+    let _ = cmd.spawn();
+    Ok(())
+}
+
 #[tauri::command]
 fn rotate_api_key(app: tauri::AppHandle, llm: tauri::State<'_, Llm>) -> Result<runtime::api::ApiInfo> {
     runtime::api::rotate_key(&app, &llm)
@@ -1248,6 +1285,7 @@ pub fn run() {
             set_accent,
             get_data_root,
             reveal_data_root,
+            open_link,
             is_portable,
             import_dataset,
             list_datasets,

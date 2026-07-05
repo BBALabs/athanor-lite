@@ -8,6 +8,7 @@ import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from
 import { save } from "@tauri-apps/plugin-dialog";
 import { useStore, useLatestSample } from "../state/store";
 import { IN_TAURI } from "../lib/tauriEnv";
+import { LITE } from "../lib/edition";
 import { Markdown } from "../components/Markdown";
 import { PlusIcon, TrashIcon, SearchIcon, ExportIcon, CloseIcon } from "../components/Icons";
 import { PromptLibrary } from "../components/PromptLibrary";
@@ -242,8 +243,8 @@ function ModelChooser() {
             Nothing installed yet. Get a model from the catalog — the recommended one is
             already picked out for this machine.
           </p>
-          <button className="btn-lit" onClick={() => setView("models")}>
-            Open Models
+          <button className="btn-lit" onClick={() => setView(LITE ? "home" : "models")}>
+            {LITE ? "See what fits this machine" : "Open Models"}
           </button>
         </>
       ) : (

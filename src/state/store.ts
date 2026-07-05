@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { ipc } from "../lib/ipc";
 import { getWalkthrough } from "../lib/coach";
 import { applyAccent } from "../lib/theme";
+import { LITE } from "../lib/edition";
 import {
   isAthanorError,
   type Catalog,
@@ -26,7 +27,15 @@ import {
   type WorkspaceList,
 } from "../lib/types";
 
-export type View = "chat" | "knowledge" | "dashboard" | "models" | "workspaces" | "training" | "compare";
+export type View =
+  | "home"
+  | "chat"
+  | "knowledge"
+  | "dashboard"
+  | "models"
+  | "workspaces"
+  | "training"
+  | "compare";
 
 const PENDING_CONV = "pending";
 export type BootPhase = "booting" | "ready" | "error";
@@ -100,6 +109,11 @@ interface AthanorStore {
 
   setView: (v: View) => void;
   dismissOnboarding: () => void;
+  /**
+   * Lite's one-click "run this model": makes sure a chat workspace exists,
+   * binds the model to it, pre-warms the engine, and lands in Chat.
+   */
+  liteLaunch: (sha256: string) => Promise<void>;
   setOpsOpen: (open: boolean) => void;
   loadKnowledge: () => Promise<void>;
   addDocuments: (paths: string[]) => Promise<void>;
@@ -181,7 +195,7 @@ export const useStore = create<AthanorStore>((set, get) => ({
   bootError: null,
   degraded: [],
 
-  view: "dashboard",
+  view: LITE ? "home" : "dashboard",
   hardware: null,
   recommendations: null,
   catalog: null,
@@ -214,6 +228,34 @@ export const useStore = create<AthanorStore>((set, get) => ({
 
   setView: (view) => set({ view }),
   dismissOnboarding: () => set({ onboardingNeeded: false }),
+
+  liteLaunch: async (sha256) => {
+    try {
+      const s = get();
+      let ws =
+        s.workspaces.workspaces.find((w) => w.id === s.workspaces.activeId) ??
+        s.workspaces.workspaces[0] ??
+        null;
+      if (!ws) {
+        ws = await ipc.createWorkspace({ name: "My Chat", purpose: "", accentHue: 275, glyph: "M" });
+      }
+      await ipc.setWorkspaceModel(ws.id, sha256);
+      if (get().workspaces.activeId !== ws.id) await ipc.activateWorkspace(ws.id);
+      set({
+        workspaces: await ipc.listWorkspaces(),
+        view: "chat",
+        activeConv: null,
+        streamText: null,
+      });
+      await get().loadConversations();
+      // Pre-warm the engine so the first reply starts fast. Quiet on purpose:
+      // a duplicate-start is harmless, and a real failure surfaces in the
+      // Operations drawer and again on the first send.
+      void ipc.startEngine(ws.id).catch(() => {});
+    } catch (e) {
+      set({ lastOpError: errText(e) });
+    }
+  },
   setOpsOpen: (opsOpen) => set({ opsOpen }),
 
   loadKnowledge: async () => {
@@ -530,20 +572,22 @@ export const useStore = create<AthanorStore>((set, get) => ({
       /* templates are optional starting points */
     }
 
-    try {
-      const needed = await ipc.onboardingNeeded();
-      const s = get();
-      // Only greet a genuinely fresh install — existing state means the user
-      // already knows the app.
-      set({
-        onboardingNeeded:
-          needed && s.workspaces.workspaces.length === 0 && s.library.length === 0,
-      });
-      if (!needed && s.workspaces.workspaces.length > 0) {
-        set({ view: "chat" });
+    if (!LITE) {
+      try {
+        const needed = await ipc.onboardingNeeded();
+        const s = get();
+        // Only greet a genuinely fresh install — existing state means the user
+        // already knows the app.
+        set({
+          onboardingNeeded:
+            needed && s.workspaces.workspaces.length === 0 && s.library.length === 0,
+        });
+        if (!needed && s.workspaces.workspaces.length > 0) {
+          set({ view: "chat" });
+        }
+      } catch {
+        /* onboarding is optional sugar */
       }
-    } catch {
-      /* onboarding is optional sugar */
     }
 
     const { degraded } = get();

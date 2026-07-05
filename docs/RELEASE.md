@@ -85,3 +85,32 @@ $env:ATHANOR_SELFTEST="mcp";    npm run tauri dev      # connect server-everythi
 ```
 
 Upload the installer + write `latest.json` with the `.sig` contents. Done.
+
+## 4. Athanor Lite — the free "what can my machine run" edition
+
+Lite is a **build-time cut of the same app**: hardware scan → ranked
+recommendations → one-click download-verify-chat, plus Ollama adopt-in-place.
+Workspaces, RAG, MCP, Tune, and Compare stay in the binary's backend but are
+not mounted in the UI. Same identifier and data root as the full app, so a
+Lite install upgraded to full Athanor keeps every model and conversation.
+
+The edition gate is a single Vite mode flag (`src/lib/edition.ts`); the Rust
+side is identical in both editions.
+
+```powershell
+# Dev (real hardware):
+npm run tauri:lite:dev
+
+# Dev (browser design harness; add #cpu or #dualgpu to the URL to preview
+# CPU-only and pooled multi-GPU machines):
+npm run dev:lite
+
+# Release build — same signing/updater env as §3:
+npm run tauri:lite:build
+```
+
+Lite pre-release gate: the §3 gate plus
+`$env:ATHANOR_SELFTEST="chat"; npm run tauri:lite:dev` (exercises the exact
+engine-launch path Lite's one-click flow uses), and a manual pass of the
+first-run flow: fresh data root → scan → download the recommended pick →
+auto-land in chat → first reply.

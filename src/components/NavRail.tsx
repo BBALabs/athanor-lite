@@ -5,17 +5,23 @@
 
 import { useStore, type View } from "../state/store";
 import { monogram } from "../lib/format";
+import { LITE } from "../lib/edition";
 import { ChatIcon, CompareIcon, KnowledgeIcon, ModelsIcon, SettingsIcon, SpacesIcon, SystemIcon, TuneIcon } from "./Icons";
 
-const SECTIONS: { view: View; label: string; icon: typeof SystemIcon }[] = [
-  { view: "chat", label: "Chat", icon: ChatIcon },
-  { view: "knowledge", label: "Knowledge", icon: KnowledgeIcon },
-  { view: "models", label: "Models", icon: ModelsIcon },
-  { view: "compare", label: "Compare", icon: CompareIcon },
-  { view: "training", label: "Tune", icon: TuneIcon },
-  { view: "dashboard", label: "System", icon: SystemIcon },
-  { view: "workspaces", label: "Workspaces", icon: SpacesIcon },
-];
+const SECTIONS: { view: View; label: string; icon: typeof SystemIcon }[] = LITE
+  ? [
+      { view: "home", label: "Your machine", icon: SystemIcon },
+      { view: "chat", label: "Chat", icon: ChatIcon },
+    ]
+  : [
+      { view: "chat", label: "Chat", icon: ChatIcon },
+      { view: "knowledge", label: "Knowledge", icon: KnowledgeIcon },
+      { view: "models", label: "Models", icon: ModelsIcon },
+      { view: "compare", label: "Compare", icon: CompareIcon },
+      { view: "training", label: "Tune", icon: TuneIcon },
+      { view: "dashboard", label: "System", icon: SystemIcon },
+      { view: "workspaces", label: "Workspaces", icon: SpacesIcon },
+    ];
 
 export function NavRail({ onSettings }: { onSettings: () => void }) {
   const view = useStore((s) => s.view);
@@ -41,7 +47,7 @@ export function NavRail({ onSettings }: { onSettings: () => void }) {
       </div>
 
       <div className="rail__bottom">
-        {workspaces.length > 0 && (
+        {!LITE && workspaces.length > 0 && (
           <div className="rail__spaces">
             {workspaces.slice(0, 5).map((ws) => (
               <button

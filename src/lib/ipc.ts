@@ -172,6 +172,8 @@ const tauriIpc = {
   getDataRoot: () => invoke<string>("get_data_root"),
   revealDataRoot: () => invoke<void>("reveal_data_root"),
   isPortable: () => invoke<boolean>("is_portable"),
+  /** Opens one of the few allowlisted external pages in the system browser. */
+  openLink: (url: string) => invoke<void>("open_link", { url }),
 
   importDataset: (workspaceId: string, name: string, path: string) =>
     invoke<DatasetReport>("import_dataset", { workspaceId, name, path }),
