@@ -1,0 +1,67 @@
+/* ═══════════════════════════════════════════════════════════════
+   Athanor design tokens — "Black Glass" (v2).
+   One dark cabin, one warm light source (the spine, left). Surfaces
+   are alpha steps over the field; accent exists only as light.
+   Binding spec: docs/DESIGN.md
+   ═══════════════════════════════════════════════════════════════ */
+
+:root {
+  /* Field — black glass with plum warmth */
+  --field: #0a070e;
+
+  /* Surfaces — alpha over the field (calibration-proof luminance steps) */
+  --srf-1: rgba(244, 240, 234, 0.025);
+  --srf-2: rgba(244, 240, 234, 0.05);
+  --srf-3: rgba(244, 240, 234, 0.085);
+
+  /* Ink — warm off-white */
+  --ink-hi: #f4f0ea;
+  --ink-mid: rgba(244, 240, 234, 0.62);
+  --ink-low: rgba(244, 240, 234, 0.38);
+  --ink-ghost: rgba(244, 240, 234, 0.18);
+
+  /* The light — one accent system, warm violet → orchid → filament */
+  --lume: #a06bff;
+  --lume-warm: #c99af5;
+  --lume-hot: #efd9ff;
+  --lume-deep: #4c2b85;
+
+  /* Semantics — desaturated, warm; appear only on threshold breach */
+  --ok: #9bd8a8;
+  --warn: #e7c088;
+  --bad: #e29a94;
+
+  /* Type */
+  --font-display: "Outfit Variable", "Outfit", sans-serif;
+  --font-ui: "Instrument Sans Variable", "Instrument Sans", sans-serif;
+  --font-mono: "JetBrains Mono Variable", "JetBrains Mono", monospace;
+
+  /* Space — 8 / 16 / 28 / 48 / 72 (prefer the larger step) */
+  --sp-1: 8px;
+  --sp-2: 16px;
+  --sp-3: 28px;
+  --sp-4: 48px;
+  --sp-5: 72px;
+
+  /* Radius — one language */
+  --r-srf: 20px;
+  --r-hero: 28px;
+  --r-el: 10px;
+
+  /* Motion — nothing snaps, nothing bounces */
+  --glide: cubic-bezier(0.22, 0.9, 0.24, 1);
+  --t-hover: 200ms;
+  --t-layout: 480ms;
+  --t-choreo: 800ms;
+
+  /* Material recipes */
+  --catchlight: inset 0 1px 0 rgba(244, 240, 234, 0.04);
+  --depth: 0 24px 60px -24px rgba(0, 0, 0, 0.7);
+  --underglow: 0 18px 50px -18px rgba(160, 107, 255, 0.3);
+
+  /* Layout */
+  --rail-w: 76px;
+  --titlebar-h: 44px;
+  --statusbar-h: 32px;
+  --gutter: var(--sp-4);
+}

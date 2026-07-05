@@ -1,0 +1,1825 @@
+/* ═══════════════════════════════════════════════════════════════
+   Athanor — "Black Glass" application chrome + views.
+   One dark cabin, one warm light source. Light does the layout;
+   lines never do. Spec: docs/DESIGN.md
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Registered so the spine's mood shift can glide, not jump. */
+@property --spine-c {
+  syntax: "<color>";
+  initial-value: #a06bff;
+  inherits: true;
+}
+
+/* ── The cabin ─────────────────────────────────────────────── */
+
+.shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background:
+    radial-gradient(1100px 850px at 5% 18%, rgba(160, 107, 255, 0.10) 0%, rgba(160, 107, 255, 0.04) 45%, transparent 78%),
+    radial-gradient(1100px 800px at 92% 115%, rgba(76, 43, 133, 0.10) 0%, rgba(76, 43, 133, 0.04) 45%, transparent 75%),
+    var(--field);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Grain — dithers the bloom so large gradients never band. */
+.shell::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="140" height="140"><filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" stitchTiles="stitch"/><feColorMatrix type="saturate" values="0"/></filter><rect width="140" height="140" filter="url(%23n)"/></svg>');
+  opacity: 0.022;
+  pointer-events: none;
+}
+
+.shell__body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
+
+.shell__main {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overflow-anchor: none;
+  scrollbar-gutter: stable;
+  padding: var(--sp-3) var(--gutter) var(--sp-4);
+}
+
+/* ── View choreography — the cabin slides, never snaps ─────── */
+
+.view {
+  max-width: 1280px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+.view > * {
+  animation: viewRise var(--t-choreo) var(--glide) both;
+}
+
+.view > *:nth-child(2) { animation-delay: 90ms; }
+.view > *:nth-child(3) { animation-delay: 180ms; }
+.view > *:nth-child(4) { animation-delay: 270ms; }
+
+@keyframes viewRise {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.view-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-4);
+}
+
+.view-head__sub {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Titlebar — transparent glass ──────────────────────────── */
+
+.titlebar {
+  height: var(--titlebar-h);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-left: var(--sp-3);
+  position: relative;
+  z-index: 5;
+  flex-shrink: 0;
+}
+
+.titlebar__brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.titlebar__mark {
+  color: var(--lume-warm);
+  opacity: 0.9;
+}
+
+.titlebar__wordmark {
+  font-family: var(--font-display);
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0.3em;
+  color: var(--ink-mid);
+}
+
+/* Browser-harness marker — quiet, but impossible to mistake for real data. */
+.titlebar__harness {
+  margin-left: var(--sp-2);
+  padding: 3px 10px;
+  border-radius: var(--r-el);
+  background: rgba(231, 192, 136, 0.1);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--warn);
+}
+
+/* Window controls ghost until approached. */
+.titlebar__controls {
+  display: flex;
+  height: 100%;
+  opacity: 0.3;
+  transition: opacity var(--t-layout) var(--glide);
+}
+
+.titlebar__controls:hover {
+  opacity: 1;
+}
+
+.titlebar__btn {
+  width: 46px;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  color: var(--ink-low);
+  transition: color var(--t-hover) var(--glide), background var(--t-hover) var(--glide);
+}
+
+.titlebar__btn:hover {
+  color: var(--ink-hi);
+  background: var(--srf-1);
+}
+
+.titlebar__btn--close:hover {
+  color: var(--bad);
+  background: rgba(226, 154, 148, 0.08);
+}
+
+/* ── Rail — icons floating on the glass ────────────────────── */
+
+.rail {
+  width: var(--rail-w);
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--sp-2) 0 var(--sp-2);
+  position: relative;
+  z-index: 4;
+}
+
+.rail__sections {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+
+.rail__item {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border-radius: var(--r-el);
+  color: rgba(244, 240, 234, 0.5);
+  transition: color var(--t-hover) var(--glide), background var(--t-hover) var(--glide);
+}
+
+.rail__item:hover {
+  color: rgba(244, 240, 234, 0.75);
+  background: var(--srf-1);
+}
+
+.rail__item--active {
+  color: var(--ink-hi);
+}
+
+.rail__item-light {
+  width: 12px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--lume);
+  box-shadow: 0 0 8px rgba(160, 107, 255, 0.6);
+  transform: scaleX(0);
+  transition: transform var(--t-layout) var(--glide);
+}
+
+.rail__item--active .rail__item-light {
+  transform: scaleX(1);
+}
+
+/* ── The Ambient Spine — the one light source ──────────────── */
+
+.spine {
+  position: relative;
+  width: 0;
+  z-index: 3;
+  transition: --spine-c 2000ms var(--glide);
+}
+
+.spine__band,
+.spine__halo,
+.spine__flare {
+  position: absolute;
+  top: 6%;
+  bottom: 6%;
+  pointer-events: none;
+}
+
+.spine__band {
+  left: -1.5px;
+  width: 3px;
+  background: linear-gradient(
+    180deg,
+    transparent,
+    var(--spine-c) 30%,
+    var(--lume-hot) 50%,
+    var(--spine-c) 70%,
+    transparent
+  );
+  animation: spineBreathe 8s ease-in-out infinite;
+}
+
+.spine__halo {
+  left: -6px;
+  width: 12px;
+  background: linear-gradient(180deg, transparent, var(--spine-c) 50%, transparent);
+  filter: blur(28px);
+  opacity: 0.45;
+  animation: spineBreathe 8s ease-in-out infinite;
+}
+
+.spine__flare {
+  left: -10px;
+  width: 20px;
+  background: linear-gradient(180deg, transparent, var(--lume-hot) 50%, transparent);
+  filter: blur(32px);
+  animation: spineFlare 900ms var(--glide) forwards;
+}
+
+@keyframes spineBreathe {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 1; }
+}
+
+.spine__halo { animation-name: spineHaloBreathe; }
+
+@keyframes spineHaloBreathe {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 0.55; }
+}
+
+@keyframes spineFlare {
+  from { opacity: 0.8; }
+  to { opacity: 0; }
+}
+
+/* ── Status line ───────────────────────────────────────────── */
+
+.statusbar {
+  height: var(--statusbar-h);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--sp-3);
+  position: relative;
+  z-index: 5;
+}
+
+.statusbar__cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 200px;
+}
+
+.statusbar__cell--center { justify-content: center; }
+.statusbar__cell--right { justify-content: flex-end; }
+
+/* The app's one heartbeat. */
+.statusbar__beat {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ink-ghost);
+  transition: background var(--t-layout) var(--glide);
+}
+
+.statusbar__beat--live {
+  background: var(--lume-warm);
+  animation: beat 3s ease-in-out infinite;
+}
+
+@keyframes beat {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(201, 154, 245, 0.4); }
+  50% { box-shadow: 0 0 10px 1px rgba(201, 154, 245, 0.25); }
+}
+
+.statusbar__monogram {
+  font-family: var(--font-display);
+  font-size: 11px;
+  color: hsla(var(--ws-hue), 60%, 80%, 0.8);
+}
+
+/* ── Boot — ignition ───────────────────────────────────────── */
+
+.boot {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  background: var(--field);
+  transition: opacity 700ms var(--glide), visibility 700ms;
+}
+
+.boot--lift {
+  opacity: 0;
+  visibility: hidden;
+}
+
+.boot__sweep {
+  position: absolute;
+  left: calc(var(--rail-w) - 6px);
+  top: 0;
+  bottom: 0;
+  width: 12px;
+  background: linear-gradient(180deg, transparent, var(--lume) 50%, transparent);
+  filter: blur(26px);
+  opacity: 0;
+  transform: scaleY(0.2);
+  transform-origin: top;
+  animation: bootSweep 1100ms var(--glide) 100ms forwards;
+}
+
+@keyframes bootSweep {
+  40% { opacity: 0.6; }
+  100% { opacity: 0.4; transform: scaleY(1); }
+}
+
+.boot__center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transform: translateY(-4vh);
+}
+
+.boot__mark {
+  color: var(--lume-warm);
+  animation: bootFade 900ms var(--glide) both;
+}
+
+.boot__wordmark {
+  margin-top: var(--sp-2);
+  font-family: var(--font-display);
+  font-size: 21px;
+  font-weight: 500;
+  color: var(--ink-hi);
+  letter-spacing: 0.18em;
+  text-indent: 0.18em;
+  animation: bootTracking 1100ms var(--glide) both;
+}
+
+@keyframes bootTracking {
+  from { opacity: 0; letter-spacing: 0.5em; text-indent: 0.5em; }
+  to { opacity: 1; letter-spacing: 0.18em; text-indent: 0.18em; }
+}
+
+@keyframes bootFade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.boot__progress {
+  margin-top: var(--sp-4);
+  position: relative;
+  width: 220px;
+  height: 2px;
+}
+
+.boot__progress-track {
+  position: absolute;
+  inset: 0;
+  background: var(--ink-ghost);
+  opacity: 0.5;
+}
+
+.boot__progress-lit {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  background: linear-gradient(90deg, var(--lume-deep), var(--lume-warm));
+  transition: width var(--t-layout) var(--glide);
+}
+
+.boot__step {
+  margin-top: 12px;
+  min-height: 18px;
+  transition: opacity var(--t-hover) var(--glide);
+}
+
+.boot__step--failed { color: var(--bad); }
+
+.boot__error {
+  margin-top: var(--sp-3);
+  text-align: center;
+  max-width: 460px;
+}
+
+.boot__error-msg {
+  color: var(--ink-mid);
+  user-select: text;
+}
+
+.boot__retry {
+  margin-top: var(--sp-2);
+  padding: 9px 26px;
+  border-radius: var(--r-el);
+  background: var(--srf-2);
+  box-shadow: var(--catchlight);
+  color: var(--ink-hi);
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 13px;
+  transition: background var(--t-hover) var(--glide);
+}
+
+.boot__retry:hover { background: var(--srf-3); }
+
+/* ── Dashboard — the instrument cluster ────────────────────── */
+
+.cluster {
+  /* Symmetric air above and below — the void is deliberate, never leftover. */
+  margin-block: auto;
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) auto minmax(300px, 1.1fr);
+  align-items: center;
+  gap: var(--sp-5);
+  padding: var(--sp-3) 0;
+}
+
+@media (max-width: 1180px) {
+  .cluster {
+    grid-template-columns: 1fr auto;
+    gap: var(--sp-4);
+  }
+  .cluster__rec { grid-column: 1 / -1; }
+}
+
+.cluster__id {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cluster__id-name {
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--ink-hi);
+}
+
+.cluster__id-name--dim {
+  color: var(--ink-mid);
+  font-weight: 400;
+}
+
+.cluster__id-class { margin-top: 6px; }
+.cluster__id-drv { font-variant-numeric: tabular-nums; }
+
+/* The ring */
+.ring { position: relative; }
+
+.ring__center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  text-align: center;
+}
+
+.ring__of { font-variant-numeric: tabular-nums; }
+
+/* Recommendation */
+.cluster__rec {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cluster__rec-name { margin-top: 2px; }
+
+.cluster__rec-fit { font-variant-numeric: tabular-nums; }
+
+.cluster__rec-note {
+  max-width: 420px;
+  line-height: 1.55;
+}
+
+.cluster__alts {
+  margin-top: var(--sp-2);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cluster__alt {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  max-width: 380px;
+  padding: 5px 0;
+}
+
+.cluster__alt-name {
+  font-size: 13px;
+  color: var(--ink-low);
+  transition: color var(--t-hover) var(--glide);
+}
+
+.cluster__alt .t-mono {
+  color: rgba(244, 240, 234, 0.28);
+  transition: color var(--t-hover) var(--glide);
+}
+
+.cluster__alt:hover .cluster__alt-name { color: var(--ink-mid); }
+.cluster__alt:hover .t-mono { color: var(--ink-low); }
+
+/* ── Zone B — the telemetry band ───────────────────────────── */
+
+.band {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--sp-4);
+  flex-wrap: wrap;
+  padding: var(--sp-4) 0 var(--sp-2);
+}
+
+/* Every cell shares one internal row template — labels, numerals, subs, and
+   light-lines land on identical baselines across the whole band. */
+.band__cell {
+  position: relative;
+  display: grid;
+  grid-template-rows: 16px 34px 18px 10px;
+  align-items: end;
+  min-width: 170px;
+  flex: 1;
+  max-width: 300px;
+}
+
+.band__cell--minor {
+  min-width: 120px;
+  max-width: 180px;
+  flex: 0.6;
+}
+
+.band__value {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.band__unit {
+  font-family: var(--font-display);
+  font-size: 13px;
+  color: var(--ink-low);
+}
+
+.band__minor-value {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 400;
+  color: var(--ink-mid);
+}
+
+/* The whisper trace floats out of flow so it can never push its cell. */
+.band__spark {
+  position: absolute;
+  right: 0;
+  top: -6px;
+  opacity: 0.8;
+}
+
+.band__sub { font-variant-numeric: tabular-nums; }
+
+/* The light-line */
+.lightline {
+  position: relative;
+  width: 100%;
+  height: 2px;
+  margin-top: 4px;
+}
+
+.lightline__track {
+  position: absolute;
+  inset: 0;
+  background: rgba(244, 240, 234, 0.1);
+}
+
+.lightline__lit {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  transition: width 700ms var(--glide), background 700ms var(--glide);
+}
+
+/* The reflection glowing onto the dash. */
+.lightline__mirror {
+  position: absolute;
+  top: 3px;
+  left: 0;
+  height: 6px;
+  transform: scaleY(-1);
+  filter: blur(5px);
+  opacity: 0.3;
+  -webkit-mask-image: linear-gradient(180deg, transparent 20%, black);
+  mask-image: linear-gradient(180deg, transparent 20%, black);
+  transition: width 700ms var(--glide), background 700ms var(--glide);
+}
+
+/* ── Zone C — role picks ───────────────────────────────────── */
+
+.roles {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 10px;
+  padding-top: var(--sp-3);
+}
+
+.roles__pair {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.roles__sep { color: var(--ink-ghost); }
+
+.roles__role {
+  color: var(--ink-low);
+  text-transform: capitalize;
+}
+
+.roles__model { color: var(--ink-mid); }
+
+/* ── Models — the showroom ─────────────────────────────────── */
+
+.models__import {
+  margin-left: auto;
+  color: var(--lume-warm);
+}
+
+.view-head .models__import + .filters {
+  margin-left: var(--sp-3);
+}
+
+.filters {
+  margin-left: auto;
+  display: flex;
+  gap: var(--sp-2);
+}
+
+.filters__btn {
+  position: relative;
+  padding: 6px 2px;
+  font-size: 12.5px;
+  font-weight: 450;
+  color: var(--ink-low);
+  transition: color var(--t-hover) var(--glide);
+}
+
+.filters__btn::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 100%;
+  bottom: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--lume-deep), var(--lume-warm));
+  transition: right var(--t-layout) var(--glide);
+}
+
+.filters__btn:hover { color: var(--ink-mid); }
+
+.filters__btn--active { color: var(--ink-hi); }
+
+.filters__btn--active::after { right: 0; }
+
+/* A quiet dot parts the role filters from the sort controls. */
+.filters__sep {
+  align-self: center;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--ink-ghost);
+}
+
+.filters__btn--sort { font-size: 12px; }
+
+.models__disk { color: var(--ink-low); }
+
+.ledger {
+  display: flex;
+  flex-direction: column;
+}
+
+.ledger-row {
+  position: relative;
+  padding: var(--sp-2) var(--sp-3);
+  margin: 0 calc(-1 * var(--sp-3));
+  border-radius: var(--r-srf);
+  cursor: pointer;
+  transition: opacity var(--t-hover) var(--glide);
+  overflow: hidden;
+}
+
+/* Hover is light passing over the row, not a box filling. */
+.ledger-row::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(160, 107, 255, 0.055) 30%, transparent 75%);
+  opacity: 0;
+  transition: opacity var(--t-layout) var(--glide);
+  pointer-events: none;
+}
+
+.ledger-row:hover::after { opacity: 1; }
+
+.ledger-row--out { opacity: 0.38; }
+
+.ledger-row__main {
+  display: grid;
+  grid-template-columns: minmax(280px, 1.4fr) 1fr auto;
+  align-items: center;
+  gap: var(--sp-3);
+  min-height: 64px;
+}
+
+.ledger-row--hero .ledger-row__main {
+  min-height: 108px;
+}
+
+.ledger-row__id {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.ledger-row__meta {
+  text-transform: capitalize;
+  font-variant-numeric: tabular-nums;
+}
+
+.ledger-row__blurb {
+  max-width: 560px;
+  line-height: 1.55;
+}
+
+/* Hero row — the one lit surface in the ledger */
+.ledger-row--hero {
+  background: var(--srf-1);
+  box-shadow: var(--catchlight), var(--depth), var(--underglow);
+  padding: var(--sp-3);
+  margin-bottom: var(--sp-2);
+}
+
+.ledger-row__sweep {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 42%, rgba(239, 217, 255, 0.05) 50%, transparent 58%);
+  background-size: 260% 100%;
+  animation: sweep 7s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes sweep {
+  0% { background-position: 130% 0; }
+  45%, 100% { background-position: -130% 0; }
+}
+
+/* Fit jewels */
+.jewels {
+  display: flex;
+  gap: 11px;
+  justify-content: flex-end;
+}
+
+.jewel {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.jewel--fits {
+  background: radial-gradient(circle at 35% 30%, var(--lume-hot), var(--lume) 55%, var(--lume-deep));
+  box-shadow: 0 0 9px rgba(160, 107, 255, 0.65), 0 3px 8px -2px rgba(160, 107, 255, 0.5);
+}
+
+.jewel--tight {
+  background: radial-gradient(circle at 35% 30%, #f3dcb2, var(--warn) 60%, #6b5330);
+  box-shadow: 0 0 7px rgba(231, 192, 136, 0.4);
+}
+
+/* Partial offload — GPU+CPU split: GPU light, dimmed (some layers on CPU). */
+.jewel--partial {
+  background: radial-gradient(circle at 35% 30%, var(--lume-warm), var(--lume-deep) 62%, #201133);
+  box-shadow: 0 0 6px rgba(160, 107, 255, 0.35);
+}
+
+/* CPU-only — neutral ink, no accent light: it runs, but not on the GPU. */
+.jewel--cpu {
+  background: radial-gradient(circle at 35% 30%, rgba(244, 240, 234, 0.3), rgba(244, 240, 234, 0.1) 65%);
+}
+
+.jewel--no {
+  background: radial-gradient(circle at 35% 30%, rgba(244, 240, 234, 0.14), rgba(244, 240, 234, 0.04) 65%);
+}
+
+.quant-table__verdict--partial { color: var(--lume-warm); }
+.quant-table__verdict--cpu { color: var(--ink-low); }
+
+/* In-place expansion */
+.ledger-row__detail {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--t-layout) var(--glide);
+}
+
+.ledger-row--open .ledger-row__detail {
+  grid-template-rows: 1fr;
+}
+
+.ledger-row__detail-inner {
+  overflow: hidden;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.ledger-row__detail-inner > :first-child {
+  margin-top: var(--sp-2);
+}
+
+.quant-table {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-bottom: 4px;
+}
+
+.quant-table__row {
+  display: grid;
+  grid-template-columns: 18px 90px 130px 150px 1fr auto;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: 6px 0;
+  min-height: 40px;
+  font-variant-numeric: tabular-nums;
+}
+
+.quant-table__verdict--fits { color: var(--ink-mid); }
+.quant-table__verdict--tight { color: var(--warn); }
+.quant-table__verdict--no { color: var(--ink-ghost); }
+
+.quant-table__meta {
+  padding-top: var(--sp-1);
+}
+
+/* Download / installed states */
+.quant-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  justify-self: end;
+  font-size: 11.5px;
+}
+
+.quant-action--installed { color: var(--ok); }
+
+.quant-action--live { color: var(--lume-warm); }
+
+.quant-action__cancel {
+  display: grid;
+  place-items: center;
+  padding: 4px;
+  border-radius: var(--r-el);
+  color: var(--ink-low);
+  transition: color var(--t-hover) var(--glide);
+}
+
+.quant-action__cancel:hover { color: var(--bad); }
+
+/* The download affordance must read as a button at rest — a lit pill with a
+   visible surface and a lume ring, not quiet text you only find by hovering. */
+.quant-action__get {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 14px;
+  border-radius: var(--r-el);
+  font-size: 11.5px;
+  font-weight: 550;
+  color: var(--lume-hot);
+  background: var(--srf-3);
+  box-shadow:
+    var(--catchlight),
+    0 0 0 1px rgba(160, 107, 255, 0.28);
+  transition: background var(--t-hover) var(--glide), box-shadow var(--t-hover) var(--glide);
+}
+
+.quant-action__get:hover {
+  background: rgba(160, 107, 255, 0.14);
+  box-shadow:
+    var(--catchlight),
+    0 0 0 1px rgba(160, 107, 255, 0.5),
+    0 8px 22px -10px rgba(160, 107, 255, 0.55);
+}
+
+.quant-action__delete {
+  display: inline-grid;
+  place-items: center;
+  padding: 2px 5px;
+  border-radius: 6px;
+  font-size: 10.5px;
+  color: var(--ink-low);
+  transition: color var(--t-hover) var(--glide), background var(--t-hover) var(--glide);
+}
+
+.quant-action__delete:hover {
+  color: var(--bad);
+  background: var(--srf-2);
+}
+
+.quant-action__delete--armed { color: var(--bad); }
+
+.hero-action__get {
+  margin-top: var(--sp-2);
+  align-self: flex-start;
+}
+
+.hero-action__progress {
+  margin-top: var(--sp-2);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 420px;
+  cursor: default;
+}
+
+.hero-action__progress .btn-quiet {
+  align-self: flex-start;
+  padding: 4px 10px;
+}
+
+.ledger-row__installed { color: var(--ok); }
+
+/* ── The sheet — creation on glass ─────────────────────────── */
+
+.sheet-veil {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(10, 7, 14, 0.55);
+  backdrop-filter: blur(24px) saturate(1.2);
+  animation: veilIn 400ms var(--glide) both;
+}
+
+@keyframes veilIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* A true bottom sheet — docked to the edge, glass you can read. */
+.sheet {
+  width: min(720px, 100%);
+  margin-bottom: 0;
+  padding: var(--sp-4) var(--sp-4) var(--sp-3);
+  border-radius: var(--r-hero) var(--r-hero) 0 0;
+  background: rgba(34, 26, 46, 0.92);
+  box-shadow: inset 0 1px 0 rgba(244, 240, 234, 0.06), var(--depth), var(--underglow);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  animation: sheetRise 480ms var(--glide) both;
+}
+
+@keyframes sheetRise {
+  from { opacity: 0; transform: translateY(28px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.sheet__actions {
+  display: flex;
+  gap: var(--sp-1);
+}
+
+/* ── Buttons — quiet by default, lit when primary ──────────── */
+
+.btn-quiet {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: var(--r-el);
+  font-size: 12.5px;
+  font-weight: 450;
+  color: var(--ink-mid);
+  transition: color var(--t-hover) var(--glide), background var(--t-hover) var(--glide);
+}
+
+.btn-quiet:hover {
+  color: var(--ink-hi);
+  background: var(--srf-1);
+}
+
+.btn-lit {
+  padding: 9px 22px;
+  border-radius: var(--r-el);
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--lume-hot);
+  background: var(--srf-3);
+  box-shadow: var(--catchlight), 0 12px 30px -12px rgba(160, 107, 255, 0.45);
+  transition: background var(--t-hover) var(--glide), box-shadow var(--t-hover) var(--glide),
+    opacity var(--t-hover) var(--glide);
+}
+
+.btn-lit:hover:not(:disabled) {
+  background: rgba(244, 240, 234, 0.12);
+  box-shadow: var(--catchlight), 0 12px 34px -10px rgba(160, 107, 255, 0.6);
+}
+
+.btn-lit:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  box-shadow: var(--catchlight);
+}
+
+/* ── Chat — the room ───────────────────────────────────────── */
+
+.chat {
+  height: 100%;
+}
+
+.chat__layout {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  gap: var(--sp-4);
+}
+
+.sessions {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding-top: 6px;
+}
+
+.sessions__head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding-bottom: var(--sp-2);
+}
+
+.sessions__ws {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sessions__new {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--r-el);
+  color: var(--ink-low);
+  transition: color var(--t-hover) var(--glide), background var(--t-hover) var(--glide);
+}
+
+.sessions__new:hover {
+  color: var(--ink-hi);
+  background: var(--srf-1);
+}
+
+.sessions__list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.session {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 9px 12px;
+  border-radius: var(--r-el);
+  cursor: pointer;
+  transition: background var(--t-hover) var(--glide);
+}
+
+.session:hover { background: var(--srf-1); }
+
+.session--active {
+  background: var(--srf-1);
+  box-shadow: inset 2px 0 0 var(--lume);
+}
+
+.session__title {
+  font-size: 12.5px;
+  color: var(--ink-mid);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.session--active .session__title { color: var(--ink-hi); }
+
+.session__meta { font-size: 10.5px; }
+
+/* Row actions (export · delete) — revealed on hover, top-right. */
+.session__actions {
+  position: absolute;
+  top: 7px;
+  right: 6px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity var(--t-hover) var(--glide);
+}
+
+.session:hover .session__actions,
+.session--active .session__actions {
+  opacity: 1;
+}
+
+.session__act {
+  color: var(--ink-low);
+  padding: 3px;
+  border-radius: 6px;
+  transition: color var(--t-hover) var(--glide), background var(--t-hover) var(--glide);
+}
+
+.session__act:hover {
+  color: var(--lume-warm);
+  background: var(--srf-2);
+}
+
+/* Inline rename — a luminous baseline, no box. */
+.session__rename {
+  font-size: 12.5px;
+  color: var(--ink-hi);
+  background: var(--srf-2);
+  border-radius: 6px;
+  padding: 2px 6px;
+  box-shadow: inset 0 -1px 0 var(--lume);
+}
+
+/* Search box in the rail head. */
+.sessions__search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  margin-bottom: 6px;
+  border-radius: var(--r-el);
+  background: var(--srf-1);
+  color: var(--ink-low);
+  transition: box-shadow var(--t-hover) var(--glide);
+}
+
+.sessions__search:focus-within {
+  box-shadow: inset 0 -1px 0 var(--lume);
+}
+
+.sessions__search input {
+  flex: 1;
+  min-width: 0;
+  font-size: 12.5px;
+  color: var(--ink-hi);
+  background: transparent;
+}
+
+.sessions__search input::placeholder { color: var(--ink-low); }
+
+.sessions__search-clear {
+  flex: none;
+  color: var(--ink-low);
+  padding: 2px;
+  border-radius: 5px;
+  transition: color var(--t-hover) var(--glide);
+}
+
+.sessions__search-clear:hover { color: var(--ink-hi); }
+
+/* Search results — the list the rail shows while a query is active. */
+.search-results {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.search-hit {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 10px 12px;
+  border-radius: var(--r-el);
+  text-align: left;
+  transition: background var(--t-hover) var(--glide);
+}
+
+.search-hit:hover { background: var(--srf-2); }
+
+.search-hit__title {
+  font-size: 12.5px;
+  color: var(--ink-hi);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.search-hit__meta { font-size: 10.5px; }
+
+.search-hit__snippet {
+  font-size: 11.5px;
+  color: var(--ink-low);
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.sessions__empty {
+  padding: 12px;
+}
+
+.sessions__model {
+  padding-top: var(--sp-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Speed benchmark leaderboard ───────────────────────────── */
+
+.bench {
+  margin-top: var(--sp-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.bench__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+}
+
+.bench__run {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+}
+
+.bench__select { max-width: 260px; }
+
+.bench__board {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Each model: name, a light bar (fraction of the fastest), the big number. */
+.bench__row {
+  display: grid;
+  grid-template-columns: minmax(140px, 1.4fr) minmax(80px, 2fr) auto;
+  grid-template-rows: auto auto;
+  align-items: center;
+  gap: 2px var(--sp-2);
+  padding: 10px 4px;
+}
+
+.bench__model { grid-column: 1; grid-row: 1; color: var(--ink-hi); }
+
+.bench__bar {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--srf-2);
+  overflow: hidden;
+}
+
+.bench__bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--lume-deep), var(--lume) 70%, var(--lume-warm));
+  box-shadow: 0 0 10px -2px rgba(160, 107, 255, 0.6);
+  transition: width var(--t-layout) var(--glide);
+}
+
+.bench__tps {
+  grid-column: 3;
+  grid-row: 1 / span 2;
+  justify-self: end;
+  font-size: 26px;
+}
+
+.bench__unit { font-size: 12px; }
+
+.bench__meta { grid-column: 1; grid-row: 2; font-size: 11px; }
+
+.bench__empty { padding: 4px; line-height: 1.6; }
+
+/* ── Live inference HUD ────────────────────────────────────── */
+
+@keyframes hudFade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.inf-hud {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-3);
+  padding: 8px 4px 2px;
+  animation: hudFade var(--t-layout) var(--glide) both;
+}
+
+.inf-hud__cell {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 2px;
+}
+
+.inf-hud__n {
+  font-family: var(--font-display);
+  font-size: 17px;
+  color: var(--lume-warm);
+}
+
+/* ── Degraded subsystem state ──────────────────────────────── */
+
+.degraded {
+  margin-block: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  max-width: 480px;
+}
+
+.degraded__note {
+  line-height: 1.6;
+}
+
+/* ── Rail bottom (settings) ────────────────────────────────── */
+
+.rail__bottom {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.rail__settings {
+  height: 40px;
+  width: 40px;
+}
+
+/* ── Settings sheet ────────────────────────────────────────── */
+
+.sheet--settings {
+  max-height: 82vh;
+  overflow-y: auto;
+  gap: var(--sp-3);
+}
+
+.setting {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  padding-top: var(--sp-3);
+}
+
+/* Zones separate by space + a top catch-light, never a hairline (spec §1). */
+.setting + .setting {
+  margin-top: var(--sp-1);
+  box-shadow: inset 0 1px 0 rgba(244, 240, 234, 0.05);
+}
+
+/* Accent picker — discs under one light. */
+.pref-accents {
+  display: flex;
+  gap: var(--sp-2);
+  margin-top: 4px;
+}
+
+.pref-accent {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 4px;
+  color: var(--ink-low);
+  transition: color var(--t-hover) var(--glide);
+}
+
+.pref-accent__disc {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.2), transparent 45%),
+    var(--swatch);
+  opacity: 0.6;
+  box-shadow: 0 0 0 0 transparent;
+  transition: opacity var(--t-hover) var(--glide), box-shadow var(--t-hover) var(--glide);
+}
+
+.pref-accent:hover { color: var(--ink-mid); }
+.pref-accent:hover .pref-accent__disc { opacity: 0.85; }
+
+.pref-accent--active { color: var(--ink-hi); }
+
+.pref-accent--active .pref-accent__disc {
+  opacity: 1;
+  box-shadow: 0 0 0 3px var(--field), 0 0 0 4px var(--swatch), 0 0 16px -2px var(--swatch);
+}
+
+.setting__row--between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  margin-top: 6px;
+}
+
+.setting__path {
+  font-size: 11px;
+  color: var(--ink-mid);
+  user-select: text;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 60%;
+  text-align: right;
+}
+
+/* A lit micro-label, not a chip (no fill) — spec §1/§3. */
+.setting__badge {
+  margin-left: 10px;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--lume-warm);
+  vertical-align: middle;
+}
+
+.setting__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sp-3);
+}
+
+.setting__blurb {
+  margin-top: 4px;
+  line-height: 1.6;
+  max-width: 460px;
+}
+
+.setting__note { line-height: 1.6; }
+
+.setting__reveal {
+  align-self: flex-start;
+  padding: 4px 0;
+}
+
+.setting__payload {
+  max-height: 220px;
+  overflow: auto;
+  background: rgba(0, 0, 0, 0.35);
+  border-radius: var(--r-el);
+  padding: 12px 14px;
+  font-size: 10.5px;
+  line-height: 1.5;
+  user-select: text;
+}
+
+.setting__rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.setting__row {
+  display: grid;
+  grid-template-columns: 90px 1fr;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.copyable {
+  position: relative;
+  text-align: left;
+  padding: 7px 10px;
+  border-radius: var(--r-el);
+  background: rgba(0, 0, 0, 0.3);
+  color: var(--ink-mid);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: background var(--t-hover) var(--glide);
+}
+
+.copyable:hover { background: rgba(0, 0, 0, 0.45); }
+
+.copyable__hint {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 9.5px;
+  color: var(--lume-warm);
+  opacity: 0;
+  transition: opacity var(--t-hover) var(--glide);
+}
+
+.copyable:hover .copyable__hint { opacity: 1; }
+
+.sheet__actions--end { justify-content: flex-end; margin-top: var(--sp-1); }
+
+/* The switch — a track that fills with light. */
+.switch {
+  flex-shrink: 0;
+  width: 40px;
+  height: 22px;
+  border-radius: 11px;
+  background: rgba(244, 240, 234, 0.08);
+  position: relative;
+  transition: background var(--t-layout) var(--glide), box-shadow var(--t-layout) var(--glide);
+}
+
+.switch--on {
+  background: var(--lume-deep);
+  box-shadow: 0 0 12px rgba(160, 107, 255, 0.35), var(--catchlight);
+}
+
+.switch__dot {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--ink-mid);
+  transition: transform var(--t-layout) var(--glide), background var(--t-layout) var(--glide);
+}
+
+.switch--on .switch__dot {
+  transform: translateX(18px);
+  background: var(--lume-hot);
+}
+
+/* ── Operations drawer ─────────────────────────────────────── */
+
+.statusbar__ops {
+  color: var(--ink-low);
+  font-size: 10.5px;
+  padding: 3px 8px;
+  border-radius: var(--r-el);
+  transition: color var(--t-hover) var(--glide), background var(--t-hover) var(--glide);
+}
+
+.statusbar__ops:hover {
+  color: var(--ink-hi);
+  background: var(--srf-1);
+}
+
+.statusbar__ops--failed { color: var(--warn); }
+
+.ops-drawer {
+  position: fixed;
+  top: calc(var(--titlebar-h) + var(--sp-2));
+  right: var(--sp-2);
+  bottom: calc(var(--statusbar-h) + var(--sp-2));
+  width: 340px;
+  z-index: 55;
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--r-hero);
+  background: rgba(24, 17, 33, 0.92);
+  backdrop-filter: blur(20px) saturate(1.15);
+  box-shadow: var(--catchlight), var(--depth);
+  padding: var(--sp-3);
+  animation: drawerIn 420ms var(--glide) both;
+}
+
+@keyframes drawerIn {
+  from { opacity: 0; transform: translateX(24px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.ops-drawer__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: var(--sp-2);
+}
+
+.ops-drawer__empty {
+  line-height: 1.6;
+  padding-top: var(--sp-1);
+}
+
+.ops-drawer__list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.op {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: var(--sp-2);
+  border-radius: var(--r-srf);
+  background: var(--srf-1);
+  box-shadow: var(--catchlight);
+}
+
+.op--failed { box-shadow: var(--catchlight), inset 2px 0 0 var(--warn); }
+.op--cancelled { opacity: 0.65; }
+
+.op__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.op__label {
+  font-size: 13px;
+  color: var(--ink-hi);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.op__meta { font-size: 10.5px; }
+
+.op__error {
+  color: var(--warn);
+  line-height: 1.5;
+  user-select: text;
+}
+
+.op__actions {
+  display: flex;
+  gap: 6px;
+}
+
+.op__btn {
+  padding: 4px 10px;
+  font-size: 11px;
+}
+
+/* ── Toast ─────────────────────────────────────────────────── */
+
+.toast {
+  position: fixed;
+  bottom: calc(var(--statusbar-h) + var(--sp-2));
+  right: var(--sp-3);
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 440px;
+  padding: 12px 16px;
+  border-radius: var(--r-srf);
+  background: rgba(20, 14, 28, 0.88);
+  backdrop-filter: blur(16px);
+  box-shadow: var(--catchlight), var(--depth);
+  animation: sheetRise 420ms var(--glide) both;
+}
+
+.toast > svg {
+  color: var(--bad);
+  flex-shrink: 0;
+}
+
+.toast__msg {
+  font-size: 12.5px;
+  color: var(--ink-mid);
+  user-select: text;
+}
+
+.toast__close {
+  color: var(--ink-low);
+  padding: 4px;
+  border-radius: var(--r-el);
+  transition: color var(--t-hover) var(--glide);
+}
+
+.toast__close:hover { color: var(--ink-hi); }
+
+/* ── Sparkline ─────────────────────────────────────────────── */
+
+.sparkline { display: block; }
+
+/* ── Library rows — a quiet ledger of what's on disk ──────────── */
+
+.lite-library {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.lite-library > .t-label { margin: 0 var(--sp-2) var(--sp-1); }
+
+.lite-row {
+  display: grid;
+  grid-template-columns: 34px 14px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: 64px;
+  padding: 10px var(--sp-2);
+  border-radius: var(--r-srf);
+  transition: background var(--t-hover) var(--glide);
+}
+
+.lite-row:hover { background: var(--srf-1); }
+
+.lite-row__rank {
+  font-family: var(--font-display);
+  font-weight: 300;
+  font-size: 15px;
+  color: var(--ink-ghost);
+  text-align: right;
+}
+
+.lite-row__rank--dot { font-size: 19px; line-height: 1; }
+
+.lite-row__id {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.lite-row__id .t-quiet {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Actions ──────────────────────────────────────────────────── */
+
+.lite-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  justify-self: end;
+  white-space: nowrap;
+}

@@ -1,0 +1,48 @@
+[package]
+name = "athanor"
+version = "0.1.0"
+description = "Athanor Lite — see what AI your machine can run, then run it."
+authors = ["Tony Winslow <tonywinslow@bbasecure.com>"]
+edition = "2021"
+
+[lib]
+# The `_lib` suffix may seem redundant but it is necessary
+# to make the lib name unique and wouldn't conflict with the bin name.
+# This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
+name = "athanor_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-log = "2"
+tauri-plugin-single-instance = "2"
+tauri-plugin-updater = "2"
+tauri-plugin-dialog = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sysinfo = "=0.33.1"
+nvml-wrapper = "0.10"
+thiserror = "2"
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "rustls-tls", "gzip", "json"] }
+sha2 = "0.10"
+hex = "0.4"
+zip = { version = "2", default-features = false, features = ["deflate"] }
+log = "0.4"
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1", features = ["v4"] }
+
+[target.'cfg(windows)'.dependencies]
+wmi = "0.14"
+winreg = "0.55"
+windows = { version = "0.58", features = ["Win32_Foundation", "Win32_Security", "Win32_System_JobObjects", "Win32_System_Threading"] }
+
+# Thin LTO + parallel codegen: links in minutes with negligible runtime cost —
+# inference runs in a separate llama-server process, so the app shell's
+# micro-optimizations don't move the needle.
+[profile.release]
+lto = "thin"
+codegen-units = 16
+strip = true

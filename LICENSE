@@ -1,0 +1,27 @@
+Athanor Lite — Source-Available License
+
+Copyright (c) 2026 Tony Winslow / Black Box Analytics. All rights reserved.
+
+Permission is granted to any person obtaining a copy of this source code to:
+
+  1. View, study, and evaluate the source code;
+  2. Build the software from source and use the resulting binaries for
+     personal, non-commercial purposes;
+  3. Fork the repository and submit modifications back to the upstream
+     project.
+
+The following are NOT permitted without prior written permission from
+Black Box Analytics:
+
+  a. Redistributing the software or modified versions of it, in source or
+     binary form, as a product or service;
+  b. Commercial use of the software or derivative works;
+  c. Removing or altering copyright notices or this license.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
