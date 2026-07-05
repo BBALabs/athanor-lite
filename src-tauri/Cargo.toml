@@ -46,7 +46,11 @@ wmi = "0.14"
 winreg = "0.55"
 windows = { version = "0.58", features = ["Win32_Foundation", "Win32_Security", "Win32_System_JobObjects", "Win32_System_Threading"] }
 
+# Thin LTO + parallel codegen: fat LTO on this dep tree (Tauri + LanceDB + Arrow +
+# DataFusion, all statically linked) took 29 min and never finished linking. Thin LTO
+# links in minutes with negligible runtime cost — inference runs in a separate
+# llama-server process, so the app shell's micro-optimizations don't move the needle.
 [profile.release]
-lto = true
-codegen-units = 1
+lto = "thin"
+codegen-units = 16
 strip = true
