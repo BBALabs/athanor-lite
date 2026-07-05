@@ -166,8 +166,9 @@ function QuantAction({ entry, quant, mode }: { entry: CatalogEntry; quant: Quant
   }
   return (
     <button
-      className="btn-quiet quant-action__get"
+      className="quant-action__get"
       onClick={stop(() => void startDownload(entry.id, quant.label))}
+      title={`Download ${quant.label} — ${quant.fileGb.toFixed(1)} GB, verified`}
     >
       Get · {quant.fileGb.toFixed(1)} GB
     </button>

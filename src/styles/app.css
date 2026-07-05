@@ -966,9 +966,30 @@
 
 .quant-action__cancel:hover { color: var(--bad); }
 
+/* The download affordance must read as a button at rest — a lit pill with a
+   visible surface and a lume ring, not quiet text you only find by hovering. */
 .quant-action__get {
-  padding: 5px 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 14px;
+  border-radius: var(--r-el);
   font-size: 11.5px;
+  font-weight: 550;
+  color: var(--lume-hot);
+  background: var(--srf-3);
+  box-shadow:
+    var(--catchlight),
+    0 0 0 1px rgba(160, 107, 255, 0.28);
+  transition: background var(--t-hover) var(--glide), box-shadow var(--t-hover) var(--glide);
+}
+
+.quant-action__get:hover {
+  background: rgba(160, 107, 255, 0.14);
+  box-shadow:
+    var(--catchlight),
+    0 0 0 1px rgba(160, 107, 255, 0.5),
+    0 8px 22px -10px rgba(160, 107, 255, 0.55);
 }
 
 .quant-action__delete {
