@@ -33,3 +33,6 @@ license.key
 *-signing.key
 *.pkcs8
 athanor-data/
+
+# shortcuts and other machine-local artifacts
+*.lnk
