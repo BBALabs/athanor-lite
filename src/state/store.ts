@@ -147,6 +147,8 @@ interface AthanorStore {
   searchConversations: (query: string) => Promise<void>;
   clearSearch: () => void;
   chooseWorkspaceModel: (sha256: string | null) => Promise<void>;
+  stopEngine: () => Promise<void>;
+  restartEngine: () => Promise<void>;
   applySystemPrompt: (prompt: string | null) => Promise<void>;
   createWorkspace: (args: {
     name: string;
@@ -887,6 +889,27 @@ export const useStore = create<AthanorStore>((set, get) => ({
     try {
       await ipc.setWorkspaceModel(wsId, sha256);
       set({ workspaces: await ipc.listWorkspaces() });
+    } catch (e) {
+      set({ lastOpError: errText(e) });
+    }
+  },
+
+  stopEngine: async () => {
+    try {
+      await ipc.stopEngine();
+    } catch (e) {
+      set({ lastOpError: errText(e) });
+    }
+  },
+
+  restartEngine: async () => {
+    const wsId = get().workspaces.activeId;
+    if (!wsId) return;
+    try {
+      await ipc.stopEngine();
+      // Brief pause so the process fully exits before restarting.
+      await new Promise((r) => setTimeout(r, 600));
+      await ipc.startEngine(wsId);
     } catch (e) {
       set({ lastOpError: errText(e) });
     }

@@ -10,7 +10,7 @@ import { useStore, useLatestSample } from "../state/store";
 import { IN_TAURI } from "../lib/tauriEnv";
 import { LITE } from "../lib/edition";
 import { Markdown } from "../components/Markdown";
-import { PlusIcon, TrashIcon, SearchIcon, ExportIcon, CloseIcon } from "../components/Icons";
+import { PlusIcon, TrashIcon, SearchIcon, ExportIcon, CloseIcon, PlayIcon, StopCircleIcon, RestartIcon } from "../components/Icons";
 import { PromptLibrary } from "../components/PromptLibrary";
 import { bytesHuman, monogram, relativeTime } from "../lib/format";
 import { KnowledgeIcon } from "../components/Icons";
@@ -502,6 +502,9 @@ export function Chat() {
   const clearSearch = useStore((s) => s.clearSearch);
   const maybeStartCoach = useStore((s) => s.maybeStartCoach);
   const applySystemPrompt = useStore((s) => s.applySystemPrompt);
+  const serverStatus = useStore((s) => s.serverStatus);
+  const stopEngine = useStore((s) => s.stopEngine);
+  const restartEngine = useStore((s) => s.restartEngine);
 
   const [draft, setDraft] = useState("");
   const [showPrompts, setShowPrompts] = useState(false);
@@ -655,9 +658,30 @@ export function Chat() {
             {ws.systemPrompt ? "System prompt active" : "Prompt library"}
           </button>
           {model && (
-            <div className="sessions__model t-quiet" title={model.fileName}>
-              {model.displayName}
-              {model.quant ? ` · ${model.quant}` : ""}
+            <div className="engine-control">
+              <div className="engine-control__model t-quiet" title={model.fileName}>
+                <span className={`engine-control__dot engine-control__dot--${serverStatus?.phase ?? "stopped"}`} />
+                {model.displayName}
+                {model.quant ? ` · ${model.quant}` : ""}
+              </div>
+              <div className="engine-control__actions">
+                {serverStatus?.phase === "ready" ? (
+                  <>
+                    <button className="engine-control__btn" onClick={() => void stopEngine()} title="Stop model">
+                      <StopCircleIcon size={12} />
+                    </button>
+                    <button className="engine-control__btn" onClick={() => void restartEngine()} title="Restart model">
+                      <RestartIcon size={12} />
+                    </button>
+                  </>
+                ) : serverStatus?.phase === "stopped" || !serverStatus ? (
+                  <button className="engine-control__btn engine-control__btn--start" onClick={() => void restartEngine()} title="Start model">
+                    <PlayIcon size={12} />
+                  </button>
+                ) : (
+                  <span className="engine-control__status t-quiet">{serverStatus.phase}…</span>
+                )}
+              </div>
             </div>
           )}
         </aside>
@@ -707,7 +731,7 @@ export function Chat() {
                   onChange={(e) => setDraft(e.target.value)}
                   onKeyDown={onKey}
                   placeholder="Ask anything — this never leaves your computer"
-                  rows={Math.min(6, Math.max(1, draft.split("\n").length))}
+                  rows={Math.min(8, Math.max(2, draft.split("\n").length))}
                   disabled={generating}
                 />
                 {generating ? (

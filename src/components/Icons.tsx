@@ -214,3 +214,27 @@ export function CloseIcon(props: IconProps) {
     </svg>
   );
 }
+
+export function PlayIcon(props: IconProps) {
+  return (
+    <svg {...base({ size: 14, ...props })}>
+      <path d="M7 5v14l11-7z" />
+    </svg>
+  );
+}
+
+export function StopCircleIcon(props: IconProps) {
+  return (
+    <svg {...base({ size: 14, ...props })}>
+      <rect x="7" y="7" width="10" height="10" rx="1" />
+    </svg>
+  );
+}
+
+export function RestartIcon(props: IconProps) {
+  return (
+    <svg {...base({ size: 14, ...props })}>
+      <path d="M21 2v6h-6M3 12a9 9 0 0 1 15-6.7L21 8M3 22v-6h6M21 12a9 9 0 0 1-15 6.7L3 16" />
+    </svg>
+  );
+}

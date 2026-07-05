@@ -2032,25 +2032,139 @@
   display: flex;
   align-items: flex-end;
   gap: var(--sp-2);
-  padding-bottom: var(--sp-1);
+  padding: var(--sp-2);
+  background: var(--srf-1);
+  border-radius: var(--r-srf);
+  box-shadow: var(--catchlight);
+  margin-bottom: var(--sp-2);
+  transition: background var(--t-hover) var(--glide), box-shadow var(--t-hover) var(--glide);
+}
+
+.composer:focus-within {
+  background: var(--srf-2);
+  box-shadow: var(--catchlight), 0 0 0 1px rgba(160, 107, 255, 0.15);
 }
 
 .composer textarea {
   flex: 1;
-  resize: none;
+  resize: vertical;
   font-size: 14px;
-  line-height: 1.5;
-  padding: 12px 4px;
-  max-height: 180px;
+  line-height: 1.6;
+  padding: 8px 8px;
+  min-height: 48px;
+  max-height: 240px;
+  border-bottom: none;
+  background: transparent;
+  scrollbar-width: thin;
+}
+
+.composer textarea:focus {
+  border-bottom: none;
+  box-shadow: none;
+}
+
+.composer textarea::placeholder {
+  color: var(--ink-ghost);
 }
 
 .composer__send {
   padding: 9px 16px;
   font-size: 15px;
+  flex-shrink: 0;
+  margin-bottom: 2px;
 }
 
 .composer__stop {
   color: var(--warn);
+  flex-shrink: 0;
+  margin-bottom: 2px;
+}
+
+/* Engine control strip — model start/stop at bottom of sessions rail */
+.engine-control {
+  padding: var(--sp-2);
+  border-top: 1px solid rgba(244, 240, 234, 0.04);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-1);
+}
+
+.engine-control__model {
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.engine-control__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--ink-ghost);
+  transition: background 0.3s var(--glide);
+}
+
+.engine-control__dot--ready {
+  background: var(--ok);
+  box-shadow: 0 0 6px rgba(155, 216, 168, 0.4);
+}
+
+.engine-control__dot--starting,
+.engine-control__dot--loading {
+  background: var(--warn);
+  animation: beat 1.6s ease-in-out infinite;
+}
+
+.engine-control__dot--stopped {
+  background: var(--ink-ghost);
+}
+
+.engine-control__dot--error {
+  background: var(--bad);
+}
+
+.engine-control__actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.engine-control__btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  color: var(--ink-mid);
+  background: transparent;
+  transition: background var(--t-hover) var(--glide), color var(--t-hover) var(--glide);
+}
+
+.engine-control__btn:hover {
+  background: var(--srf-2);
+  color: var(--ink-hi);
+}
+
+.engine-control__btn--start {
+  color: var(--ok);
+}
+
+.engine-control__btn--start:hover {
+  background: rgba(155, 216, 168, 0.08);
+  color: var(--ok);
+}
+
+.engine-control__status {
+  font-size: 10px;
+  letter-spacing: 0.06em;
 }
 
 /* Model chooser */

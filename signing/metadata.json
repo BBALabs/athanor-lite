@@ -1,0 +1,13 @@
+{
+  "Endpoint": "https://eus.codesigning.azure.net/",
+  "CodeSigningAccountName": "bba-athanor-signing",
+  "CertificateProfileName": "athanor-public",
+  "ExcludeCredentials": [
+    "ManagedIdentityCredential",
+    "WorkloadIdentityCredential",
+    "SharedTokenCacheCredential",
+    "VisualStudioCodeCredential",
+    "AzureDeveloperCliCredential",
+    "InteractiveBrowserCredential"
+  ]
+}
