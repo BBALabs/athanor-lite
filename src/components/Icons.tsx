@@ -77,6 +77,17 @@ export function ModelsIcon(props: IconProps) {
   );
 }
 
+/** Library: a platter — the models resident on this disk. */
+export function LibraryIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <circle cx="12" cy="12" r="8" />
+      <circle cx="12" cy="12" r="2.2" strokeOpacity={0.75} />
+      <path d="M12 4a8 8 0 0 1 6.9 4" strokeOpacity={0.45} />
+    </svg>
+  );
+}
+
 /** Workspaces: rooms — one lit, three at rest. */
 export function SpacesIcon(props: IconProps) {
   return (

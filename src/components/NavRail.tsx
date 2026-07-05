@@ -6,12 +6,13 @@
 import { useStore, type View } from "../state/store";
 import { monogram } from "../lib/format";
 import { LITE } from "../lib/edition";
-import { ChatIcon, CompareIcon, KnowledgeIcon, ModelsIcon, SettingsIcon, SpacesIcon, SystemIcon, TuneIcon } from "./Icons";
+import { ChatIcon, CompareIcon, KnowledgeIcon, LibraryIcon, ModelsIcon, SettingsIcon, SpacesIcon, SystemIcon, TuneIcon } from "./Icons";
 
 const SECTIONS: { view: View; label: string; icon: typeof SystemIcon }[] = LITE
   ? [
-      { view: "home", label: "Your machine", icon: SystemIcon },
-      { view: "chat", label: "Chat", icon: ChatIcon },
+      { view: "dashboard", label: "Your machine", icon: SystemIcon },
+      { view: "models", label: "Models", icon: ModelsIcon },
+      { view: "library", label: "Library", icon: LibraryIcon },
     ]
   : [
       { view: "chat", label: "Chat", icon: ChatIcon },

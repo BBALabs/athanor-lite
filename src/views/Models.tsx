@@ -8,6 +8,7 @@ import { useEffect, useMemo, useState, type MouseEvent } from "react";
 import { useStore } from "../state/store";
 import { ipc } from "../lib/ipc";
 import { bytesHuman, ctxHuman } from "../lib/format";
+import { LITE } from "../lib/edition";
 import { CloseIcon, TrashIcon } from "../components/Icons";
 import type {
   CatalogEntry,
@@ -214,6 +215,7 @@ function HeroAction({ entry, quantLabel }: { entry: CatalogEntry; quantLabel: st
   const downloads = useStore((s) => s.downloads);
   const startDownload = useStore((s) => s.startDownload);
   const cancelDownload = useStore((s) => s.cancelDownload);
+  const liteLaunch = useStore((s) => s.liteLaunch);
 
   const quant = entry.quants.find((q) => q.label === quantLabel) ?? entry.quants[0];
   const sha = quant?.files[0]?.sha256;
@@ -224,6 +226,20 @@ function HeroAction({ entry, quantLabel }: { entry: CatalogEntry; quantLabel: st
   const active = dl && (dl.state === "starting" || dl.state === "downloading" || dl.state === "verifying");
 
   if (installed) {
+    // Lite has no workspaces — an installed model chats in one press.
+    if (LITE) {
+      return (
+        <button
+          className="btn-lit hero-action__get"
+          onClick={(e) => {
+            e.stopPropagation();
+            void liteLaunch(sha);
+          }}
+        >
+          Start chatting
+        </button>
+      );
+    }
     return <span className="hero-action__installed t-quiet">installed · ready for a workspace</span>;
   }
   if (active) {

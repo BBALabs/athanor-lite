@@ -243,7 +243,7 @@ function ModelChooser() {
             Nothing installed yet. Get a model from the catalog — the recommended one is
             already picked out for this machine.
           </p>
-          <button className="btn-lit" onClick={() => setView(LITE ? "home" : "models")}>
+          <button className="btn-lit" onClick={() => setView("models")}>
             {LITE ? "See what fits this machine" : "Open Models"}
           </button>
         </>

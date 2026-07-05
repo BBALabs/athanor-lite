@@ -28,11 +28,11 @@ import {
 } from "../lib/types";
 
 export type View =
-  | "home"
   | "chat"
   | "knowledge"
   | "dashboard"
   | "models"
+  | "library"
   | "workspaces"
   | "training"
   | "compare";
@@ -195,7 +195,7 @@ export const useStore = create<AthanorStore>((set, get) => ({
   bootError: null,
   degraded: [],
 
-  view: LITE ? "home" : "dashboard",
+  view: "dashboard",
   hardware: null,
   recommendations: null,
   catalog: null,

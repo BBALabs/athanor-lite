@@ -14,7 +14,7 @@ import { Models } from "./views/Models";
 import { Workspaces } from "./views/Workspaces";
 import { Training } from "./views/Training";
 import { Compare } from "./views/Compare";
-import { LiteHome } from "./views/LiteHome";
+import { Library } from "./views/Library";
 import { AlertIcon, CloseIcon } from "./components/Icons";
 import { monogram } from "./lib/format";
 import { ACCENT_PRESETS } from "./lib/theme";
@@ -157,13 +157,15 @@ export default function App() {
         <main className="shell__main" key={view}>
           {boot === "ready" && (
             <>
-              {view === "home" && <LiteHome />}
+              {/* Shown in every edition. Lite's nav exposes only these three. */}
+              {view === "dashboard" && <Dashboard />}
+              {view === "models" && <Models />}
+              {view === "library" && <Library />}
               {view === "chat" && <Chat />}
+              {/* Advanced surfaces — full edition only. */}
               {!LITE && (
                 <>
                   {view === "knowledge" && <Knowledge />}
-                  {view === "dashboard" && <Dashboard />}
-                  {view === "models" && <Models />}
                   {view === "compare" && <Compare />}
                   {view === "training" && <Training />}
                   {view === "workspaces" && <Workspaces />}
