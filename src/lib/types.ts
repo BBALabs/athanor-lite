@@ -427,9 +427,11 @@ export interface ChatDone {
   error: string | null;
 }
 
+export type BackendKind = "cuda12" | "cuda13" | "cpu" | "metal" | "vulkan" | "linuxCpu";
+
 export interface RuntimeState {
   phase: "checking" | "downloading" | "extracting" | "ready" | "error" | string;
-  backend: "cuda12" | "cuda13" | "cpu";
+  backend: BackendKind;
   tag: string;
   receivedBytes: number;
   totalBytes: number;
@@ -441,7 +443,7 @@ export interface ServerStatus {
   modelSha: string | null;
   modelName: string | null;
   port: number | null;
-  backend: "cuda12" | "cuda13" | "cpu" | null;
+  backend: BackendKind | null;
   gpuActive: boolean;
   vramAtLoadBytes: number | null;
   detail: string;

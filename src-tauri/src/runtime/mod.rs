@@ -2,11 +2,10 @@
 //! the lifecycle of the server process that serves the active workspace.
 //!
 //! The runtime is downloaded like a model — pinned build, progress events,
-//! extracted into `runtimes/<tag>-<backend>/`. Release zips are flat archives;
-//! llama-server.exe is a stub that loads a DLL forest, so the extracted
-//! directory is the unit of installation. The CUDA build needs the companion
-//! cudart zip extracted into the same directory (verified: the build zip does
-//! NOT bundle the CUDA runtime DLLs).
+//! extracted into `runtimes/<tag>-<backend>/`. Windows release archives are
+//! ZIP files; macOS and Linux releases are tar.gz archives. The Windows CUDA
+//! builds need a companion cudart zip extracted into the same directory
+//! (verified: the build zip does NOT bundle the CUDA runtime DLLs).
 //!
 //! Silent-CPU-fallback trap: with dynamic backends, a broken ggml-cuda.dll
 //! does not kill the process — it quietly runs on CPU. We watch the server's
@@ -68,6 +67,34 @@ const CPU_BUILD: RuntimeAsset = RuntimeAsset {
     size_bytes: 17_486_019,
 };
 
+// macOS builds — Metal acceleration is baked in, one build per architecture.
+const MACOS_ARM64_BUILD: RuntimeAsset = RuntimeAsset {
+    url: "https://github.com/ggml-org/llama.cpp/releases/download/b9867/llama-b9867-bin-macos-arm64.tar.gz",
+    size_bytes: 11_134_835,
+};
+const MACOS_X64_BUILD: RuntimeAsset = RuntimeAsset {
+    url: "https://github.com/ggml-org/llama.cpp/releases/download/b9867/llama-b9867-bin-macos-x64.tar.gz",
+    size_bytes: 11_450_643,
+};
+
+// Linux builds — CPU and Vulkan (GPU-accelerated, works with NVIDIA and AMD).
+const LINUX_X64_BUILD: RuntimeAsset = RuntimeAsset {
+    url: "https://github.com/ggml-org/llama.cpp/releases/download/b9867/llama-b9867-bin-ubuntu-x64.tar.gz",
+    size_bytes: 15_862_965,
+};
+const LINUX_ARM64_BUILD: RuntimeAsset = RuntimeAsset {
+    url: "https://github.com/ggml-org/llama.cpp/releases/download/b9867/llama-b9867-bin-ubuntu-arm64.tar.gz",
+    size_bytes: 12_864_189,
+};
+const LINUX_VULKAN_X64_BUILD: RuntimeAsset = RuntimeAsset {
+    url: "https://github.com/ggml-org/llama.cpp/releases/download/b9867/llama-b9867-bin-ubuntu-vulkan-x64.tar.gz",
+    size_bytes: 31_212_832,
+};
+const LINUX_VULKAN_ARM64_BUILD: RuntimeAsset = RuntimeAsset {
+    url: "https://github.com/ggml-org/llama.cpp/releases/download/b9867/llama-b9867-bin-ubuntu-vulkan-arm64.tar.gz",
+    size_bytes: 25_511_976,
+};
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum Backend {
@@ -76,7 +103,14 @@ pub enum Backend {
     /// CUDA 13.x build — carries kernels for the newest architectures
     /// (Blackwell sm_120); drops pre-Turing.
     Cuda13,
+    /// Windows CPU-only fallback.
     Cpu,
+    /// macOS — Metal acceleration is baked into the build (arm64 or x64 selected by arch).
+    Metal,
+    /// Linux with GPU — Vulkan backend supports both NVIDIA and AMD.
+    Vulkan,
+    /// Linux CPU-only fallback.
+    LinuxCpu,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -94,23 +128,38 @@ fn emit_state(app: &AppHandle, s: &RuntimeState) {
     let _ = app.emit(EVENT_STATE, s);
 }
 
-/// Backend by compute capability: modern cards (Turing+, CC >= 7.5) get the
-/// CUDA 13 build — required for Blackwell (CC 12.x), whose kernels do not
-/// exist in the 12.4 build (the cause of a silent CPU fallback we hit on the
-/// RTX PRO 6000). Pascal/Volta-era cards get the 12.4 build, which still
-/// carries their kernels.
+/// Select the best backend for the current machine.
+///
+/// - macOS: always Metal (baked into the release build).
+/// - Linux: Vulkan if any GPU is detected via NVML, otherwise CPU.
+/// - Windows: CUDA 13 for Turing+ cards, CUDA 12 for Pascal/Volta, CPU if no NVIDIA GPU.
 pub fn pick_backend() -> Backend {
-    let Some(nvml) = gpu::nvml() else {
-        return Backend::Cpu;
-    };
-    let cc = nvml
-        .device_by_index(0)
-        .ok()
-        .and_then(|d| d.cuda_compute_capability().ok());
-    match cc {
-        Some(cc) if cc.major > 7 || (cc.major == 7 && cc.minor >= 5) => Backend::Cuda13,
-        Some(_) => Backend::Cuda12,
-        None => Backend::Cuda12,
+    #[cfg(target_os = "macos")]
+    return Backend::Metal;
+
+    #[cfg(target_os = "linux")]
+    {
+        return if gpu::nvml().is_some() {
+            Backend::Vulkan
+        } else {
+            Backend::LinuxCpu
+        };
+    }
+
+    #[cfg(windows)]
+    {
+        let Some(nvml) = gpu::nvml() else {
+            return Backend::Cpu;
+        };
+        let cc = nvml
+            .device_by_index(0)
+            .ok()
+            .and_then(|d| d.cuda_compute_capability().ok());
+        match cc {
+            Some(cc) if cc.major > 7 || (cc.major == 7 && cc.minor >= 5) => Backend::Cuda13,
+            Some(_) => Backend::Cuda12,
+            None => Backend::Cuda12,
+        }
     }
 }
 
@@ -119,6 +168,9 @@ pub fn runtime_dir(app: &AppHandle, backend: Backend) -> Result<PathBuf> {
         Backend::Cuda12 => format!("{LLAMA_TAG}-cuda12"),
         Backend::Cuda13 => format!("{LLAMA_TAG}-cuda13"),
         Backend::Cpu => format!("{LLAMA_TAG}-cpu"),
+        Backend::Metal => format!("{LLAMA_TAG}-metal"),
+        Backend::Vulkan => format!("{LLAMA_TAG}-vulkan"),
+        Backend::LinuxCpu => format!("{LLAMA_TAG}-linux-cpu"),
     };
     Ok(workspaces::data_root(app)?.join("runtimes").join(name))
 }
@@ -133,42 +185,108 @@ pub fn ensure_runtime(app: &AppHandle, backend: Backend) -> Result<PathBuf> {
         return Ok(exe);
     }
 
-    // The prebuilt llama.cpp runtime we bundle is Windows-only today. The rest
-    // of the app (hardware, workspaces, RAG, settings, portable mode) is
-    // platform-neutral; this is the one honest boundary until macOS/Linux
-    // release assets are wired and verified on those platforms in CI. The two
-    // cfg blocks are mutually exclusive tail expressions — exactly one survives
-    // compilation and returns the function's value.
-    #[cfg(not(windows))]
-    {
-        Err(AthanorError::Runtime(format!(
-            "the managed inference engine is currently bundled for Windows only \
-             ({} support is in progress)",
-            std::env::consts::OS
-        )))
+    let ops = app.state::<Ops>();
+    let cancel = ops
+        .begin(
+            app,
+            "engine-fetch",
+            OpKind::EngineFetch,
+            &format!("Inference engine {LLAMA_TAG}"),
+            true,
+            None,
+        )
+        .ok_or_else(|| AthanorError::Runtime("engine fetch already running".into()))?;
+
+    let result = fetch_runtime(app, backend, &dir, &cancel);
+    match &result {
+        Ok(_) => ops.done(app, "engine-fetch"),
+        Err(e) if e.to_string().contains("cancelled") => ops.cancelled(app, "engine-fetch"),
+        Err(e) => ops.failed(app, "engine-fetch", &e.to_string()),
     }
+    result
+}
+
+/// Select the download assets for the current platform and backend.
+fn platform_assets(backend: Backend) -> Vec<&'static RuntimeAsset> {
+    #[cfg(windows)]
+    return match backend {
+        Backend::Cuda12 => vec![&CUDA12_BUILD, &CUDA12_RUNTIME],
+        Backend::Cuda13 => vec![&CUDA13_BUILD, &CUDA13_RUNTIME],
+        _ => vec![&CPU_BUILD],
+    };
+
+    #[cfg(target_os = "macos")]
+    {
+        let _ = backend;
+        return if cfg!(target_arch = "aarch64") {
+            vec![&MACOS_ARM64_BUILD]
+        } else {
+            vec![&MACOS_X64_BUILD]
+        };
+    }
+
+    #[cfg(target_os = "linux")]
+    return match backend {
+        Backend::Vulkan => {
+            if cfg!(target_arch = "aarch64") {
+                vec![&LINUX_VULKAN_ARM64_BUILD]
+            } else {
+                vec![&LINUX_VULKAN_X64_BUILD]
+            }
+        }
+        _ => {
+            if cfg!(target_arch = "aarch64") {
+                vec![&LINUX_ARM64_BUILD]
+            } else {
+                vec![&LINUX_X64_BUILD]
+            }
+        }
+    };
+
+    #[allow(unreachable_code)]
+    vec![&CPU_BUILD]
+}
+
+/// Extract a downloaded archive into `dest`.
+/// Windows archives are ZIP; macOS and Linux archives are tar.gz.
+fn extract_archive(archive_path: &std::path::Path, dest: &std::path::Path) -> Result<()> {
     #[cfg(windows)]
     {
-        let ops = app.state::<Ops>();
-        let cancel = ops
-            .begin(
-                app,
-                "engine-fetch",
-                OpKind::EngineFetch,
-                &format!("Inference engine {LLAMA_TAG}"),
-                true,
-                None,
-            )
-            .ok_or_else(|| AthanorError::Runtime("engine fetch already running".into()))?;
-
-        let result = fetch_runtime(app, backend, &dir, &cancel);
-        match &result {
-            Ok(_) => ops.done(app, "engine-fetch"),
-            Err(e) if e.to_string().contains("cancelled") => ops.cancelled(app, "engine-fetch"),
-            Err(e) => ops.failed(app, "engine-fetch", &e.to_string()),
-        }
-        result
+        let f = fs::File::open(archive_path)?;
+        let mut archive =
+            zip::ZipArchive::new(f).map_err(|e| AthanorError::Runtime(format!("bad archive: {e}")))?;
+        archive
+            .extract(dest)
+            .map_err(|e| AthanorError::Runtime(format!("extract failed: {e}")))?;
     }
+
+    #[cfg(unix)]
+    {
+        let status = std::process::Command::new("tar")
+            .args([
+                "xzf",
+                archive_path.to_str().unwrap_or_default(),
+                "-C",
+                dest.to_str().unwrap_or_default(),
+            ])
+            .status()
+            .map_err(|e| AthanorError::Runtime(format!("tar not found: {e}")))?;
+        if !status.success() {
+            return Err(AthanorError::Runtime(format!(
+                "tar extraction failed (exit {})",
+                status
+            )));
+        }
+        // Ensure the server binary is executable after extraction.
+        let binary = dest.join(LLAMA_BINARY);
+        if binary.exists() {
+            let _ = std::process::Command::new("chmod")
+                .args(["+x", binary.to_str().unwrap_or_default()])
+                .status();
+        }
+    }
+
+    Ok(())
 }
 
 fn fetch_runtime(
@@ -180,11 +298,7 @@ fn fetch_runtime(
     use std::sync::atomic::Ordering;
     let ops = app.state::<Ops>();
 
-    let assets: &[&RuntimeAsset] = match backend {
-        Backend::Cuda12 => &[&CUDA12_BUILD, &CUDA12_RUNTIME],
-        Backend::Cuda13 => &[&CUDA13_BUILD, &CUDA13_RUNTIME],
-        Backend::Cpu => &[&CPU_BUILD],
-    };
+    let assets = platform_assets(backend);
     let total: u64 = assets.iter().map(|a| a.size_bytes).sum();
     let mut state = RuntimeState {
         phase: "downloading".into(),
@@ -209,12 +323,12 @@ fn fetch_runtime(
 
     let mut done_bytes: u64 = 0;
     for asset in assets {
-        let zip_path = staging.join(
+        let archive_path = staging.join(
             asset
                 .url
                 .rsplit('/')
                 .next()
-                .unwrap_or("asset.zip"),
+                .unwrap_or("asset.bin"),
         );
         let mut resp = client
             .get(asset.url)
@@ -226,7 +340,7 @@ fn fetch_runtime(
                 resp.status()
             )));
         }
-        let mut file = fs::File::create(&zip_path)?;
+        let mut file = fs::File::create(&archive_path)?;
         let mut buf = vec![0u8; 1024 * 1024];
         let mut last = std::time::Instant::now();
         loop {
@@ -253,16 +367,11 @@ fn fetch_runtime(
         file.sync_all()?;
 
         state.phase = "extracting".into();
-        state.detail = format!("unpacking {}", zip_path.file_name().unwrap_or_default().to_string_lossy());
+        state.detail = format!("unpacking {}", archive_path.file_name().unwrap_or_default().to_string_lossy());
         emit_state(app, &state);
         ops.detail(app, "engine-fetch", &state.detail);
-        let f = fs::File::open(&zip_path)?;
-        let mut archive =
-            zip::ZipArchive::new(f).map_err(|e| AthanorError::Runtime(format!("bad archive: {e}")))?;
-        archive
-            .extract(&staging)
-            .map_err(|e| AthanorError::Runtime(format!("extract failed: {e}")))?;
-        fs::remove_file(&zip_path).ok();
+        extract_archive(&archive_path, &staging)?;
+        fs::remove_file(&archive_path).ok();
         state.phase = "downloading".into();
     }
 

@@ -131,10 +131,13 @@ fn detect_nvml_gpus() -> Vec<GpuInfo> {
     gpus
 }
 
-/// Full adapter sweep. NVML devices first (authoritative), then any adapter WMI
-/// knows about that NVML didn't cover, with VRAM totals pulled from the registry.
+/// Full adapter sweep. NVML devices first (authoritative for NVIDIA), then
+/// platform-specific probes for AMD/Intel/Apple Silicon.
 pub fn detect_gpus() -> Vec<GpuInfo> {
     let mut gpus = detect_nvml_gpus();
+
+    #[cfg(target_os = "macos")]
+    gpus.extend(macos_probe::detect_macos_gpus());
 
     #[cfg(windows)]
     {
@@ -316,6 +319,110 @@ mod windows_probe {
                 })
             })
             .collect()
+    }
+}
+
+/// macOS GPU detection via `system_profiler SPDisplaysDataType -json`.
+/// Covers both Apple Silicon (unified memory) and discrete AMD/Intel GPUs on
+/// Intel Macs. NVML covers NVIDIA on macOS (rare post-2019).
+#[cfg(target_os = "macos")]
+mod macos_probe {
+    use serde::Deserialize;
+
+    use super::{classify_vendor, GpuInfo, GpuVendor};
+
+    #[derive(Deserialize)]
+    struct Root {
+        #[serde(rename = "SPDisplaysDataType")]
+        gpus: Vec<Entry>,
+    }
+
+    #[derive(Deserialize)]
+    struct Entry {
+        #[serde(rename = "_name")]
+        name: Option<String>,
+        /// Dedicated VRAM for discrete GPUs (e.g. "8 GB", "2048 MB").
+        spdisplays_vram: Option<String>,
+        /// Unified/shared memory reported for Apple Silicon (same format).
+        #[serde(rename = "spdisplays_vram_shared")]
+        vram_shared: Option<String>,
+    }
+
+    fn parse_vram(s: &str) -> Option<u64> {
+        let s = s.trim();
+        if let Some(gb) = s.strip_suffix(" GB") {
+            return gb.trim().parse::<f64>().ok().map(|v| (v * 1024.0 * 1024.0 * 1024.0) as u64);
+        }
+        if let Some(mb) = s.strip_suffix(" MB") {
+            return mb.trim().parse::<f64>().ok().map(|v| (v * 1024.0 * 1024.0) as u64);
+        }
+        None
+    }
+
+    pub fn detect_macos_gpus() -> Vec<GpuInfo> {
+        let out = match std::process::Command::new("system_profiler")
+            .args(["SPDisplaysDataType", "-json"])
+            .output()
+        {
+            Ok(o) if o.status.success() => o.stdout,
+            Ok(o) => {
+                log::warn!(target: "hw", "system_profiler exited {}", o.status);
+                return Vec::new();
+            }
+            Err(e) => {
+                log::warn!(target: "hw", "system_profiler failed: {e}");
+                return Vec::new();
+            }
+        };
+        let root: Root = match serde_json::from_slice(&out) {
+            Ok(r) => r,
+            Err(e) => {
+                log::warn!(target: "hw", "system_profiler JSON parse failed: {e}");
+                return Vec::new();
+            }
+        };
+        root.gpus
+            .into_iter()
+            .filter_map(|e| {
+                let name = e.name?;
+                // Prefer dedicated VRAM; fall back to unified memory for Apple Silicon.
+                let vram_total_bytes = e
+                    .spdisplays_vram
+                    .as_deref()
+                    .and_then(parse_vram)
+                    .or_else(|| e.vram_shared.as_deref().and_then(parse_vram));
+                // Skip virtual/display-only entries with no name worth reporting.
+                let lower = name.to_ascii_lowercase();
+                if lower.contains("virtual") || lower.contains("sidecar") {
+                    return None;
+                }
+                Some(GpuInfo {
+                    vendor: classify_vendor(&name),
+                    vram_total_bytes,
+                    vram_used_bytes: None,
+                    driver_version: None,
+                    cuda_version: None,
+                    architecture: None,
+                    compute_capability: None,
+                    temperature_c: None,
+                    utilization_pct: None,
+                    source: "system_profiler".into(),
+                    name,
+                })
+            })
+            .collect()
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn parse_vram_units() {
+            assert_eq!(parse_vram("8 GB"), Some(8 * 1024 * 1024 * 1024));
+            assert_eq!(parse_vram("2048 MB"), Some(2048 * 1024 * 1024));
+            assert_eq!(parse_vram("garbage"), None);
+        }
     }
 }
 
