@@ -2,10 +2,11 @@
 
 **See exactly what AI your machine can run — then run it. Free, local, private.**
 
-Athanor Lite is a Windows desktop app that scans your hardware, tells you which
-open-source AI models actually fit your GPU (with honest memory math, not
-guesswork), and gets you from "which model?" to a private, streaming chat in one
-click. Everything runs on your machine. Nothing you type ever leaves it.
+Athanor Lite is a desktop app for Windows, macOS, and Linux that scans your
+hardware, tells you which open-source AI models actually fit your GPU (with
+honest memory math, not guesswork), and gets you from "which model?" to a
+private, streaming chat in one click. Everything runs on your machine. Nothing
+you type ever leaves it.
 
 Built by [Black Box Analytics](https://bbasecure.com).
 
@@ -44,34 +45,51 @@ literal payload before you do).
 
 ## Prerequisites
 
-- **Windows 10/11** (64-bit)
-- **WebView2 Runtime** — ships with Windows 11; Windows 10 users can get it from
-  [Microsoft](https://developer.microsoft.com/microsoft-edge/webview2/)
-- **[Ollama](https://ollama.com)** *(optional)* — only needed if you want to
-  adopt an existing Ollama model library in place
-- An NVIDIA GPU is recommended for accelerated inference; without one, models
-  run on the CPU (slower, still private)
+| Platform | Requirement |
+|---|---|
+| **Windows 10/11** | WebView2 Runtime (ships with Win 11; [download for Win 10](https://developer.microsoft.com/microsoft-edge/webview2/)) |
+| **macOS** | macOS 11+ (arm64 or x64). Metal acceleration is automatic. |
+| **Linux** | Ubuntu 20.04+ or equivalent. Vulkan driver for GPU acceleration; CPU fallback works without one. |
+| **Chromebook** | Enable Linux (Crostini) and follow the Linux instructions. |
+
+**[Ollama](https://ollama.com)** is optional on all platforms — only needed to adopt an existing model library in place.
 
 ## Building from source
 
-Toolchain:
+**1. Install Rust**
 
-- [Node.js](https://nodejs.org) 20+
-- [Rust](https://rustup.rs) (stable, MSVC toolchain)
-- [protoc](https://github.com/protocolbuffers/protobuf/releases) (Protocol
-  Buffers compiler) on your `PATH`, or point the `PROTOC` environment variable
-  at `protoc.exe` — required by a build-time dependency
+```sh
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+source ~/.cargo/env          # or restart your terminal
+```
 
-Build and run:
+On Windows, install the [MSVC toolchain](https://rustup.rs) instead and select the MSVC target when prompted.
+
+**2. Install platform dependencies**
+
+macOS:
+```sh
+xcode-select --install
+brew install protobuf
+```
+
+Linux:
+```sh
+sudo apt install -y build-essential libwebkit2gtk-4.1-dev libssl-dev \
+  libayatana-appindicator3-dev librsvg2-dev protobuf-compiler
+```
+
+Windows: download [protoc](https://github.com/protocolbuffers/protobuf/releases) and add it to your `PATH`, or set `PROTOC=C:\path\to\protoc.exe`.
+
+**3. Install Node.js dependencies and run**
 
 ```sh
 npm install
-npm run tauri:lite:dev      # run the Lite desktop app in development
-npm run tauri:lite:build    # produce a release build
+npm run tauri:lite:dev      # development — hot-reloads the UI
+npm run tauri:lite:build    # release build (.dmg / .deb / .exe installer)
 ```
 
-UI-only development in a browser (synthetic hardware data, no Rust toolchain
-needed):
+UI-only development in a browser (synthetic hardware data, no Rust needed):
 
 ```sh
 npm run dev:lite
